@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="lv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ledus Veči Spēļu protokols</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#0A0E13; --panel:#121820; --panel2:#161D27; --line:#232B36;
+  --ice:#830C67; --ice-text:#FFFFFF; --cyan:#01B7F0; --steel:#5F6D7C;
+  --win:#4CC98E; --loss:#E15A5A; --draw:#E8B24F;
+  --text:#EAF1F4; --text-dim:#8A99A3; --text-faint:#586570;
+  --home:#830C67; --away:#7C8A93;
+  --radius:10px;
+  --safe-t:env(safe-area-inset-top,0px); --safe-b:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;}
+html{scroll-padding-top:var(--safe-t);}
+body{margin:0;background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-serif;padding-top:var(--safe-t);padding-bottom:var(--safe-b);}
+::selection{background:var(--ice);color:var(--ice-text);}
+a{color:var(--ice);text-decoration:none;}
+a:hover{text-decoration:underline;}
+
+.wrap{max-width:1080px;margin:0 auto;padding:0 18px 60px;}
+
+/* ---- top bar ---- */
+.topbar{padding:20px 18px;border-bottom:1px solid var(--line);}
+.topbar-inner{max-width:1080px;margin:0 auto;width:100%;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px;}
+.brand{font-family:'Oswald',sans-serif;font-weight:700;font-size:32px;letter-spacing:0.4px;display:flex;align-items:center;gap:14px;}
+.brand img{height:46px;width:46px;object-fit:contain;}
+.brand span{color:var(--ice);}
+.tabs{display:flex;gap:4px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:3px;}
+.tab-btn{background:transparent;border:none;color:var(--text-dim);font-family:'Inter',sans-serif;font-weight:600;font-size:13px;padding:7px 16px;border-radius:6px;cursor:pointer;}
+.tab-btn.active{background:var(--ice);color:var(--ice-text);}
+
+.game-nav{
+  display:flex;align-items:center;gap:10px;padding:18px;
+  max-width:1080px;margin:0 auto;flex-wrap:wrap;
+}
+.game-nav select{
+  background:var(--panel2);color:var(--text);border:1px solid var(--line);
+  border-radius:8px;padding:9px 12px;font-family:'Inter',sans-serif;font-size:13.5px;cursor:pointer;
+}
+#seasonSelect{min-width:190px;}
+#gameSelect{flex:1;min-width:220px;}
+.nav-btn{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:8px;width:36px;height:36px;font-size:16px;cursor:pointer;flex-shrink:0;}
+.nav-btn:hover{border-color:var(--ice);color:var(--ice);}
+.nav-btn:disabled{opacity:0.35;cursor:default;}
+.season-logo-nav{width:38px;height:38px;object-fit:contain;flex-shrink:0;}
+
+/* ---- Scoreboard header ---- */
+.scoreboard{
+  background:var(--panel);
+  border:1px solid var(--line);border-radius:var(--radius);
+  padding:26px 20px;margin-bottom:22px;
+  position:relative;overflow:hidden;
+}
+.sb-glow{position:absolute;inset:0;pointer-events:none;opacity:0.16;}
+.sb-season-logo{position:absolute;top:16px;right:18px;width:72px;height:72px;object-fit:contain;z-index:2;}
+@media (max-width:520px){.sb-season-logo{width:48px;height:48px;top:12px;right:12px;}}
+.sb-meta{text-align:center;color:var(--text-dim);font-size:12.5px;margin-bottom:14px;letter-spacing:0.3px;position:relative;}
+.sb-row{display:flex;align-items:center;justify-content:center;gap:22px;flex-wrap:wrap;position:relative;}
+.sb-team{flex:1;min-width:150px;text-align:center;}
+.sb-team-logo{width:52px;height:52px;object-fit:contain;margin:0 auto 8px;display:block;}
+.sb-team-name{font-family:'Oswald',sans-serif;font-weight:600;font-size:clamp(16px,3.2vw,22px);}
+.sb-team-tag{font-size:11px;color:var(--text-dim);letter-spacing:0.5px;margin-top:2px;}
+.sb-score{font-family:'Oswald',sans-serif;font-weight:700;font-size:clamp(36px,7vw,56px);display:flex;align-items:center;gap:14px;line-height:1;}
+.sb-dash{color:var(--text-faint);font-size:0.6em;}
+.sb-result{text-align:center;margin-top:14px;position:relative;}
+.result-badge{display:inline-block;padding:5px 14px;border-radius:20px;font-family:'Oswald',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.5px;}
+.result-badge.W{background:rgba(76,201,142,0.16);color:var(--win);}
+.result-badge.L{background:rgba(225,90,90,0.14);color:var(--loss);}
+.result-badge.D{background:rgba(232,178,79,0.14);color:var(--draw);}
+.otg-line{text-align:center;color:var(--text-dim);font-size:12.5px;margin-top:10px;position:relative;}
+.otg-line b{color:var(--text);font-weight:600;}
+
+/* ---- panels ---- */
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:20px;margin-bottom:20px;}
+.panel h2{font-family:'Oswald',sans-serif;font-weight:600;font-size:16px;margin:0 0 14px;letter-spacing:0.2px;}
+
+/* ---- goal log ---- */
+.goal-cols{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
+@media (max-width:600px){.goal-cols{grid-template-columns:1fr;}}
+.goal-col-title{
+  font-size:15px;color:var(--text-dim);letter-spacing:0.3px;margin-bottom:14px;font-weight:600;
+  display:flex;align-items:center;gap:12px;
+  padding-bottom:12px;border-bottom:1px solid var(--line);
+}
+.goal-col-title img{width:40px;height:40px;object-fit:contain;flex-shrink:0;}
+.goal-col-title span{font-family:'Oswald',sans-serif;font-size:18px;font-weight:600;letter-spacing:0.4px;}
+.goal-item{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid rgba(35,43,54,0.6);font-size:13px;align-items:baseline;}
+.goal-item:last-child{border-bottom:none;}
+.goal-num{font-family:'Oswald',sans-serif;font-weight:600;color:var(--text-faint);font-size:12px;min-width:16px;}
+.goal-scorer{font-weight:600;}
+.sit-badge{
+  display:inline-block;font-size:9.5px;font-weight:700;padding:1px 6px;border-radius:4px;
+  letter-spacing:0.3px;vertical-align:middle;margin-left:2px;
+}
+.sit-PP{background:rgba(1,183,240,0.16);color:var(--cyan);}
+.sit-SH{background:rgba(232,178,79,0.16);color:var(--draw);}
+.sit-EN{background:rgba(140,140,150,0.2);color:var(--text-dim);}
+.goal-assists{color:var(--text-dim);font-size:12px;}
+.goal-video{margin-left:auto;color:var(--text);font-size:11px;white-space:nowrap;}
+.empty-note{color:var(--text-faint);font-size:12.5px;font-style:italic;}
+
+/* ---- stat compare bars ---- */
+.compare-row{margin-bottom:14px;}
+.compare-labels{display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px;}
+.compare-labels .h{font-weight:600;}
+.compare-labels .a{font-weight:600;}
+.compare-labels .mid{color:var(--text-dim);font-size:11px;}
+.compare-bar{display:flex;height:8px;border-radius:4px;overflow:hidden;background:var(--panel2);}
+
+/* ---- period table ---- */
+table{width:100%;border-collapse:collapse;font-size:13px;}
+thead th{text-align:center;padding:8px 6px;color:var(--text-dim);font-weight:600;font-size:11.5px;border-bottom:1px solid var(--line);}
+thead th:first-child{text-align:left;}
+tbody td{padding:7px 6px;text-align:center;border-bottom:1px solid rgba(35,43,54,0.6);}
+tbody td:first-child{text-align:left;font-weight:500;}
+.player-link{color:inherit;text-decoration:none;cursor:pointer;}
+.player-link:hover{text-decoration:underline;color:var(--ice);}
+tbody tr:last-child td{border-bottom:none;}
+tbody tr.expandable{cursor:pointer;}
+tbody tr.expandable:hover{background:rgba(1,183,240,0.06);}
+tr.detail-row td{padding:0;}
+.detail-wrap{padding:14px 16px 18px;background:var(--panel2);border-top:1px solid var(--line);}
+.detail-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;}
+.detail-head .name{font-family:'Oswald',sans-serif;font-weight:600;font-size:14px;}
+.detail-head a{font-size:12px;color:var(--text-dim);cursor:pointer;}
+.detail-head a:hover{color:var(--ice);}
+.chevron{display:inline-block;margin-right:6px;color:var(--text-faint);font-size:10px;transition:transform 0.15s;}
+.chevron.open{transform:rotate(90deg);}
+#detailTable{min-width:640px;font-size:12.5px;}
+#detailTable th{font-size:11px;}
+.table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+#skaterBoxTable{min-width:820px;}
+
+/* ---- lineup ice diagram ---- */
+.rink{background:linear-gradient(180deg, #0F1922, #0C141B);border:1px solid var(--line);border-radius:var(--radius);padding:20px;position:relative;}
+.rink-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px;}
+.rink-row.def{grid-template-columns:repeat(2,1fr);max-width:70%;margin:0 auto 8px;}
+.rink-row.gk{grid-template-columns:1fr;max-width:36%;margin:10px auto 0;}
+.slot{background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:8px 6px;text-align:center;font-size:11.5px;}
+.slot .slot-label{color:var(--text-faint);font-size:9.5px;letter-spacing:0.4px;margin-bottom:2px;}
+.slot .slot-name{font-weight:600;font-size:12px;}
+.slot-nr{color:var(--text-faint);font-weight:500;}
+
+/* ---- team stats record strip ---- */
+.record-strip{
+  display:grid;grid-template-columns:repeat(6,1fr);gap:1px;
+  background:var(--line);border:1px solid var(--line);border-radius:var(--radius);
+  overflow:hidden;margin:20px 0;
+}
+.record-cell{background:var(--panel);padding:16px 10px;text-align:center;}
+.record-num{font-family:'Oswald',sans-serif;font-weight:600;font-size:clamp(19px,3.4vw,28px);line-height:1;}
+.record-num.win{color:var(--win);}
+.record-num.loss{color:var(--loss);}
+.record-label{font-size:10.5px;color:var(--text-dim);margin-top:5px;letter-spacing:0.3px;}
+@media (max-width:720px){.record-strip{grid-template-columns:repeat(3,1fr);}}
+.wl-header{display:flex;justify-content:space-between;align-items:center;padding:0 4px;font-family:'Oswald',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.3px;height:33px;}
+.wl-header-loss{color:#E74C3C;}
+.wl-header-win{color:#2ECC71;}
+.wl-list{display:flex;flex-direction:column;}
+.wl-item{display:flex;align-items:stretch;height:32px;border-bottom:1px solid var(--line);cursor:pointer;}
+.wl-item:hover{background:var(--panel2);}
+.wl-bar-half{width:64px;display:flex;align-items:center;flex-shrink:0;}
+.wl-bar-half.loss{justify-content:flex-end;}
+.wl-bar{height:12px;border-radius:2px;width:100%;}
+.wl-bar.loss{background:#E74C3C;}
+.wl-bar.win{background:#2ECC71;}
+.wl-center-line{width:2px;background:#2ECC71;flex-shrink:0;}
+
+/* ---- team stats static layout ---- */
+.team-stats-static .panel{margin-bottom:16px;}
+.team-stats-row{display:flex;align-items:stretch;}
+.team-wl-col{width:200px;flex-shrink:0;margin-bottom:0;padding-right:16px;border-right:1px solid var(--line);}
+.team-gamelog-col{flex:1;min-width:0;margin-bottom:0;display:flex;flex-direction:column;padding-left:16px;}
+#teamTotalsTable{max-width:400px;}
+.team-totals-col{width:340px;flex-shrink:0;}
+.team-league-col{flex:1;min-width:0;}
+.league-updated{font-size:11px;font-weight:400;color:var(--text-faint);letter-spacing:0;}
+.league-groups-row{display:flex;gap:14px;}
+.league-group-box{
+  flex:1;min-width:0;background:var(--panel2);border:1px solid var(--line);
+  border-radius:var(--radius);padding:12px;
+}
+.league-group-title{font-family:'Oswald',sans-serif;font-weight:600;font-size:12.5px;color:var(--text-dim);margin:0 0 8px;text-transform:uppercase;letter-spacing:0.4px;}
+.league-table{font-size:12.5px;}
+.league-table tbody td:first-child{text-align:left;}
+.league-logo{width:16px;height:16px;object-fit:contain;vertical-align:middle;margin-right:6px;}
+.league-table tr.ldv-row{background:rgba(1,183,240,0.1);}
+.league-table tr.ldv-row td:first-child{font-weight:700;color:var(--ice);}
+.league-table tr.playoff-cutoff td{border-bottom:2px solid var(--draw);}
+@media (max-width:600px){.league-groups-row{flex-direction:column;}}
+.team-gamelog-col .table-scroll{max-height:480px;overflow-y:auto;}
+.wl-list{max-height:480px;overflow-y:auto;}
+#teamGameLogTable tbody td:nth-child(2){text-align:left;}
+#teamGameLogTable td, #teamGameLogTable th{white-space:nowrap;}
+#teamGameLogTable tbody td:nth-child(2){max-width:140px;overflow:hidden;text-overflow:ellipsis;}
+#teamGameLogTable thead th{height:33px;padding:0 6px;box-sizing:border-box;}
+#teamGameLogTable tbody td{height:32px;padding:0 6px;box-sizing:border-box;}
+@media (max-width:760px){
+  .team-stats-row{flex-direction:column;}
+  .team-wl-col{width:100%;}
+  .team-totals-col{width:100%;}
+}
+
+/* ---- methodology page ---- */
+.method-section{margin-bottom:28px;}
+.method-axis-title{
+  font-family:'Oswald',sans-serif;font-weight:600;font-size:20px;color:var(--ice);
+  margin-bottom:6px;display:flex;align-items:center;gap:10px;
+}
+.method-weight-row{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0;}
+.method-weight-chip{
+  background:var(--panel2);border:1px solid var(--line);border-radius:6px;
+  padding:5px 12px;font-size:12.5px;
+}
+.method-weight-chip b{color:var(--ice);}
+.method-body{color:var(--text-dim);font-size:13.5px;line-height:1.6;}
+.method-body p{margin:0 0 10px;}
+.method-body ul{margin:0 0 10px;padding-left:20px;}
+.method-body li{margin-bottom:4px;}
+.method-formula{
+  background:var(--panel2);border:1px solid var(--line);border-radius:8px;
+  padding:12px 14px;font-family:monospace;font-size:12px;color:var(--text);
+  margin:10px 0;white-space:pre-wrap;line-height:1.5;
+}
+.method-divider{border:none;border-top:1px solid var(--line);margin:24px 0;}
+
+/* ---- roster grid ---- */
+.roster-section-title{
+  font-family:'Oswald',sans-serif;font-weight:600;font-size:18px;letter-spacing:0.3px;
+  margin:28px 0 14px;color:var(--text);
+}
+.roster-section-title:first-child{margin-top:0;}
+.roster-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px;}
+.roster-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px;display:flex;gap:16px;}
+.roster-photo{
+  width:78px;height:109px;border-radius:10px;object-fit:cover;object-position:top center;
+  background:var(--panel2);border:1px solid var(--line);flex-shrink:0;
+}
+.roster-nr{font-family:'Oswald',sans-serif;font-weight:700;font-size:15px;color:var(--ice);}
+.roster-info-name{font-weight:600;font-size:16px;}
+.roster-info-meta{color:var(--text-dim);font-size:12px;margin-top:3px;}
+.roster-pos-badge{display:inline-block;font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:4px;margin-top:5px;letter-spacing:0.3px;}
+.roster-pos-badge.FWD{background:rgba(1,183,240,0.16);color:var(--cyan);}
+.roster-pos-badge.DEF{background:rgba(131,12,103,0.18);color:#E15FC0;}
+.roster-pos-badge.GK{background:rgba(232,178,79,0.14);color:var(--draw);}
+.roster-stat-row{display:flex;gap:14px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line);flex-wrap:nowrap;}
+.roster-stat{text-align:center;flex:1;min-width:0;}
+.roster-stat-num{font-family:'Oswald',sans-serif;font-weight:600;font-size:15px;}
+.roster-stat-label{color:var(--text-faint);font-size:9px;letter-spacing:0.2px;margin-top:2px;}
+
+.hidden{display:none;}
+
+/* ---- stats tab ---- */
+.filter-row{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;}
+.filter-row select, .filter-row input{
+  background:var(--panel2);border:1px solid var(--line);color:var(--text);
+  border-radius:7px;padding:8px 12px;font-family:'Inter',sans-serif;font-size:13px;
+}
+.filter-row input{flex:1;min-width:160px;}
+.stats-season-logo{width:30px;height:30px;object-fit:contain;}
+#statsTable{min-width:960px;}
+.highlight-toggle{display:flex;align-items:center;gap:7px;color:var(--text-dim);font-size:13px;cursor:pointer;}
+.highlight-toggle input{accent-color:var(--ice);width:15px;height:15px;cursor:pointer;}
+
+/* ---- player card ---- */
+.player-card{display:flex;flex-direction:column;gap:20px;}
+.card-top-row{display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap;}
+.card-photo{
+  width:150px;height:auto;aspect-ratio:210/294;border-radius:16px;object-fit:contain;
+  background:var(--panel2);border:1px solid var(--line);flex-shrink:0;
+}
+.card-body{flex:1;min-width:220px;}
+.card-name{font-family:'Oswald',sans-serif;font-weight:600;font-size:30px;letter-spacing:0.2px;}
+.card-meta{color:var(--text-dim);font-size:15px;margin-top:8px;display:flex;gap:12px;flex-wrap:wrap;align-items:center;}
+.card-meta .badge{
+  display:inline-block;font-size:12.5px;font-weight:700;padding:3px 10px;border-radius:6px;
+  background:rgba(1,183,240,0.14);color:var(--cyan);letter-spacing:0.3px;
+}
+.card-meta .badge.DEF{background:rgba(131,12,103,0.18);color:#E15FC0;}
+.card-meta .badge.GK{background:rgba(232,178,79,0.14);color:var(--draw);}
+.card-ehl{display:inline-block;margin-top:12px;font-size:13.5px;}
+.card-radar-box{width:320px;height:280px;flex-shrink:0;}
+@media (max-width:760px){.card-radar-box{width:100%;height:260px;}}
+.card-stats{
+  display:flex;flex-direction:column;gap:10px;
+  margin-top:20px;padding-top:16px;border-top:1px solid var(--line);
+}
+.card-stat-row{display:flex;gap:24px;flex-wrap:wrap;}
+@media (max-width:640px){.card-stat-row{gap:14px;}}
+.card-stat{text-align:center;min-width:44px;}
+.card-stat-num{font-family:'Oswald',sans-serif;font-weight:600;font-size:18px;}
+.card-stat-label{color:var(--text-dim);font-size:9.5px;letter-spacing:0.3px;margin-top:2px;}
+thead th.sortable{cursor:pointer;user-select:none;}
+thead th.sortable:hover{color:var(--ice);}
+thead th .arrow{opacity:0.6;font-size:10px;margin-left:3px;}
+
+footer{text-align:center;color:var(--text-faint);font-size:12px;padding:20px;}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;}}
+</style>
+</head>
+<body>
+<style>#live-banner{position:fixed;right:12px;bottom:12px;z-index:9999;font:12px/1.3 Inter,system-ui,sans-serif;background:#0f1720;color:#dfe6ee;border:1px solid #2a3644;border-radius:999px;padding:6px 12px;opacity:.92;max-width:80vw}#live-banner.ok{border-color:#2e7d4f}#live-banner.warn{border-color:#b7791f;background:#2b2210}</style><div id="live-banner">Loading latest data…</div><div id="live-loading" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(10,15,22,.88);color:#dfe6ee;font:600 16px Inter,system-ui,sans-serif;z-index:9998">Loading latest data…</div>
+
+<div class="topbar"><div class="topbar-inner">
+  <div class="brand"><img src="data:image/png;base64,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" alt=""> LEDUS <span>VEČI</span></div>
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="box">Boxscore</button>
+    <button class="tab-btn" data-tab="stats">Player stats</button>
+    <button class="tab-btn" data-tab="team">Team stats</button>
+    <button class="tab-btn" data-tab="roster">Roster</button>
+    <button class="tab-btn" data-tab="methodology">How it's calculated</button>
+  </div>
+</div></div>
+
+<div id="boxView">
+  <div class="game-nav">
+    <img id="seasonNavLogo" class="season-logo-nav" src="" alt="" style="display:none;">
+    <select id="seasonSelect"></select>
+    <button class="nav-btn" id="prevGame">‹</button>
+    <select id="gameSelect"></select>
+    <button class="nav-btn" id="nextGame">›</button>
+  </div>
+
+  <div class="wrap">
+    <div class="scoreboard">
+      <img id="sbSeasonLogo" class="sb-season-logo" src="" alt="">
+      <div class="sb-meta" id="sbMeta"></div>
+      <div class="sb-row">
+        <div class="sb-team home">
+          <img class="sb-team-logo" id="sbHomeLogo" src="" alt="">
+          <div class="sb-team-name" id="sbHomeName"></div>
+          <div class="sb-team-tag">HOME</div>
+        </div>
+        <div class="sb-score">
+          <span id="sbHomeGoals"></span><span class="sb-dash">–</span><span id="sbAwayGoals"></span>
+        </div>
+        <div class="sb-team away">
+          <img class="sb-team-logo" id="sbAwayLogo" src="" alt="">
+          <div class="sb-team-name" id="sbAwayName"></div>
+          <div class="sb-team-tag">AWAY</div>
+        </div>
+      </div>
+      <div class="sb-result"><span class="result-badge" id="sbResult"></span></div>
+      <div class="otg-line" id="sbOtg"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Goals</h2>
+      <div class="goal-cols">
+        <div class="goal-col home">
+          <div class="goal-col-title" id="goalHomeTitle"></div>
+          <div id="goalHomeList"></div>
+        </div>
+        <div class="goal-col away">
+          <div class="goal-col-title" id="goalAwayTitle"></div>
+          <div id="goalAwayList"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Match statistics</h2>
+      <div id="compareBars"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Shots &amp; faceoffs by period</h2>
+      <div class="table-scroll">
+        <table id="periodTable">
+          <thead><tr><th>Period</th><th>Goals</th><th>Goals against</th><th>Shots</th><th>Shots against</th><th>FO won</th><th>FO lost</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Starting lineup</h2>
+      <div class="rink" id="lineupRink"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Ledus Veči player stats this game</h2>
+      <div class="table-scroll">
+        <table id="skaterBoxTable">
+          <thead><tr>
+            <th>#</th><th style="text-align:left">Player</th><th>Pos</th><th>G</th><th>A</th><th>P</th><th>SOG</th><th>PIM</th><th>+/-</th><th>FO%</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="table-scroll" style="margin-top:18px;">
+        <table id="goalieBoxTable">
+          <thead><tr>
+            <th>#</th><th style="text-align:left">Goalie</th><th>Shots faced</th><th>Saves</th><th>GA</th><th>SV%</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="statsView" class="wrap hidden" style="padding-top:20px;">
+  <div class="filter-row">
+    <select id="statsPlayerSelect"></select>
+    <select id="statsSeasonSelect"></select>
+    <label class="highlight-toggle">
+      <input type="checkbox" id="statsHighlightOnly">
+      Only games with a highlight
+    </label>
+  </div>
+
+  <div class="panel player-card">
+    <div class="card-top-row">
+      <img id="cardPhoto" class="card-photo" src="" alt="">
+      <div class="card-body">
+        <div class="card-name" id="cardName"></div>
+        <div class="card-meta" id="cardMeta"></div>
+        <a id="cardEhl" class="card-ehl" href="#" target="_blank" rel="noopener">EHL profile →</a>
+        <div class="card-stats" id="cardStats"></div>
+      </div>
+      <div class="card-radar-box">
+        <canvas id="radarChart"></canvas>
+        <div id="radarEmptyMsg" class="empty-note" style="display:none;text-align:center;padding-top:40%;">No games in this range</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="table-scroll">
+      <table id="statsTable">
+        <thead><tr id="statsTableHead"></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div id="teamView" class="wrap hidden" style="padding-top:20px;">
+  <div class="filter-row">
+    <img id="teamSeasonLogo" class="stats-season-logo" src="" alt="" style="display:none;">
+    <select id="teamSeasonSelect"></select>
+  </div>
+
+  <div class="team-stats-static">
+    <div class="panel">
+      <h2>Record</h2>
+      <div class="record-strip" id="teamRecordStrip"></div>
+    </div>
+
+    <div class="panel">
+      <h2>By period</h2>
+      <div class="table-scroll">
+        <table id="teamPeriodTable">
+          <thead><tr>
+            <th style="text-align:left">Period</th><th>G</th><th>GA</th><th>Diff</th><th>S</th><th>SA</th><th>Diff</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Game log</h2>
+      <div class="team-stats-row">
+        <div class="team-wl-col">
+          <div class="wl-header"><span class="wl-header-loss">Loss</span><span class="wl-header-win">Win</span></div>
+          <div class="wl-list" id="teamWinLossList"></div>
+        </div>
+
+        <div class="team-gamelog-col">
+          <div class="table-scroll" style="max-height:480px;overflow-y:auto;">
+            <table id="teamGameLogTable">
+              <thead><tr>
+                <th style="text-align:left">Date</th><th style="text-align:left">Opponent</th>
+                <th>G</th><th>GA</th><th>Shot%</th><th>Save%</th><th>PP</th><th>PP%</th><th>PK</th><th>PK%</th>
+              </tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="team-stats-row">
+      <div class="panel team-totals-col">
+        <h2>Season totals &amp; averages</h2>
+        <table id="teamTotalsTable">
+          <thead><tr>
+            <th style="text-align:left">Stat</th><th>Total</th><th>Average / game</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <div class="panel team-league-col">
+        <h2>E5 League Table <span class="league-updated">— snapshot, updated 27.09.2026</span></h2>
+        <div class="league-groups-row">
+          <div class="league-group-box">
+            <div class="league-group-title">Ziemeļi</div>
+            <table class="league-table">
+              <thead><tr><th style="text-align:left">Team</th><th>GP</th><th>PTS</th></tr></thead>
+              <tbody id="leagueZiemeli"></tbody>
+            </table>
+          </div>
+          <div class="league-group-box">
+            <div class="league-group-title">Dienvidi</div>
+            <table class="league-table">
+              <thead><tr><th style="text-align:left">Team</th><th>GP</th><th>PTS</th></tr></thead>
+              <tbody id="leagueDienvidi"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="rosterView" class="wrap hidden" style="padding-top:20px;">
+  <div id="rosterSections"></div>
+</div>
+
+<div id="methodologyView" class="wrap hidden" style="padding-top:20px;">
+
+  <div class="panel method-section">
+    <h2 style="margin-top:0;">Skater radar</h2>
+    <p class="method-body" style="margin-top:-6px;">Every component below is compared against a pooled set of games (all regular-season games, or all playoff games, of whatever season is selected) rather than just the games in view — this keeps the comparison stable instead of being skewed by a single freak game early in a small sample.</p>
+
+    <hr class="method-divider">
+
+    <div class="method-axis-title">⚔ Offence</div>
+    <div class="method-weight-row">
+      <span class="method-weight-chip"><b>Goals</b> 48%</span>
+      <span class="method-weight-chip"><b>Assists</b> 32%</span>
+      <span class="method-weight-chip"><b>Shots</b> 20%</span>
+      <span class="method-weight-chip">+ Penalties Drawn bonus (capped)</span>
+    </div>
+    <div class="method-body">
+      <p>Goals, assists and shots on goal are each normalized 0–10 on their own, then blended by the weights above. Before normalizing, every game's raw numbers get two multipliers applied:</p>
+      <ul>
+        <li><b>Position multiplier</b> — Goals/Assists: Forwards ×0.784, Defense ×1.387 (derived from real top-scorer output by position). Shots: Forwards ×0.86, Defense ×1.34 (derived from this roster's own shot-volume rates). Position is read from what a player actually lined up as <i>that specific game</i> (the line-slot letters), not their usual roster position — so a defenseman filling in at forward for a night gets the forward multiplier that game.</li>
+        <li><b>Line multiplier</b> — Line 1 and 2 both ×1.0 (roughly equal ice time in practice, so no adjustment between them); Line 3 ×2.1, since 3rd-liners produce a lot less, grounded in this team's own scoring gap (dampened from the raw 2.92x gap observed).</li>
+      </ul>
+      <p>Assists are combined into one weighted value before normalizing — not kept as separate primary/secondary components — so a player heavy on secondary assists isn't unfairly penalized: <b>primary assist = 1.0, secondary = 0.538</b> (same ratio, just anchored differently).</p>
+      <div class="method-formula">Offence = 0.48 × Goals(0-10) + 0.32 × Assists(0-10) + 0.20 × Shots(0-10)
+                + Penalties-Drawn bonus (0 to +1, capped so total never exceeds 10)</div>
+    </div>
+
+    <hr class="method-divider">
+
+    <div class="method-axis-title">🎯 Shooting</div>
+    <div class="method-weight-row">
+      <span class="method-weight-chip">Forwards: <b>Shot% 70%</b> / SOG% 30%</span>
+      <span class="method-weight-chip">Defense: <b>Shot% 40%</b> / SOG% 60%</span>
+    </div>
+    <div class="method-body">
+      <p>Finishing (Shot%) matters more for forwards; getting the puck through traffic (SOG%) matters more for defensemen, hence the different split by position.</p>
+      <ul>
+        <li><b>Shot%</b> uses a fixed real-world range — <b>2% (bad) to 18% (elite)</b> — not roster comparison, based on real NHL shooting benchmarks (league average sits near the midpoint, ~9.5%).</li>
+        <li><b>SOG%</b> (shots on goal ÷ shot attempts) is compared against the pool, since there's no equivalent external benchmark for it.</li>
+      </ul>
+    </div>
+
+    <hr class="method-divider">
+
+    <div class="method-axis-title">🛡 Defence</div>
+    <div class="method-weight-row">
+      <span class="method-weight-chip"><b>GA-against</b> 40%</span>
+      <span class="method-weight-chip"><b>Blocks</b> 40%</span>
+      <span class="method-weight-chip"><b>Team Shot Diff</b> 20%</span>
+    </div>
+    <div class="method-body">
+      <p>All three use <b>fixed ranges</b>, not roster comparison — each grounded in either real data or this team's own observed spread:</p>
+      <ul>
+        <li><b>GA-against</b> (inverted — lower is better): goals allowed while on ice. Penalty-kill and empty-net goals against are excluded entirely where we have confirmed which specific goals those were (from real game-by-game tagging); a shorthanded goal scored against the team counts <i>more</i> (1.25x), since that's a bigger individual lapse. A line multiplier also applies (Line 3 allows more, reflecting more ice time and tougher matchups for the top lines) — regular season: 0.88 / 0.98 / 1.19; playoffs: 0.78 / 1.00 / 1.50 (benches shorten in playoff hockey). Fixed range: <b>0.55 (good) to 1.2 (bad)</b>, cross-checked against real NHL GA/60 benchmarks scaled down to an amateur ~15-minute game.</li>
+        <li><b>Blocks</b> get a position multiplier (Forwards ×1.44, Defense ×0.68, since blocks are rarer for forwards) and a fixed range of <b>0 to 1.5</b> blocks/game.</li>
+        <li><b>Team Shot Differential</b> — the team's shots-for minus shots-against in games this specific player appeared in, averaged per game. This is a coarser "team performance when this player plays" signal, not true individual on-ice tracking (the sheet doesn't record that), which is why it carries a smaller 20% share. Fixed range: <b>-8 to +12</b>.</li>
+      </ul>
+    </div>
+
+    <hr class="method-divider">
+
+    <div class="method-axis-title">✋ Discipline</div>
+    <div class="method-body">
+      <p>PIM per game, inverted (fewer penalties = better), compared only against <b>same-position peers</b> — forwards vs. forwards, defensemen vs. defensemen — since the two take penalties at different rates for different reasons.</p>
+    </div>
+
+    <hr class="method-divider">
+
+    <div class="method-axis-title">⭕ Faceoffs</div>
+    <div class="method-body">
+      <p>Only shown for players who've actually taken draws. Faceoff win % on a fixed range: <b>40% (bad) to 60% (elite)</b>.</p>
+    </div>
+  </div>
+
+  <div class="panel method-section">
+    <h2 style="margin-top:0;">Goalie radar</h2>
+    <p class="method-body" style="margin-top:-6px;">All three goalie benchmarks below come from the real OlyBet EHL E5 league leaderboard (across the 2024-25 and 2025-26 seasons, both regular season and playoffs) — not this roster's own goalies, and not an NHL comparison.</p>
+
+    <hr class="method-divider">
+
+    <div class="method-axis-title">🥅 Save %</div>
+    <div class="method-body">
+      <p>Fixed range, split by season type since real league data showed playoff SV% runs meaningfully higher (tighter, more defensive playoff hockey):</p>
+      <ul>
+        <li><b>Regular season:</b> 82% (bad) to 91% (elite)</li>
+        <li><b>Playoffs:</b> 86% (bad) to 93% (elite)</li>
+      </ul>
+      <p>Both derived from the real league's 10th/90th percentile split, filtered to goalies with a meaningful sample (5+ GP for season entries, 3+ GP for playoffs).</p>
+    </div>
+
+    <hr class="method-divider">
+
+    <div class="method-axis-title">✅ Quality Start %</div>
+    <div class="method-body">
+      <p>The share of games where a goalie's <i>own SV% that specific game</i> met or beat the real league median for that season type — <b>87.8% in the regular season, 89.7% in playoffs</b> — the same methodology Rob Vollman's original NHL "Quality Start" stat uses, just applied with this league's real threshold instead of the NHL's. Scored on a fixed range of <b>30% to 80%</b>.</p>
+    </div>
+
+    <hr class="method-divider">
+
+    <div class="method-axis-title">📊 Consistency</div>
+    <div class="method-body">
+      <p>The <b>downside deviation</b> of a goalie's per-game SV% — not full standard deviation. Only games <i>below</i> their own baseline count toward the penalty; a shutout or any great game above it contributes zero, since "inconsistent" should mean having bad nights, not good ones.</p>
+      <p>The baseline itself <b>excludes shutout games</b> when computing the average — otherwise a single shutout would pull the average up and make ordinary good games look "below average" when they aren't really bad nights at all.</p>
+      <div class="method-formula">baseline = average of all non-shutout games (or all games, if every game was a shutout)
+downside deviation = √( average of min(0, game SV% - baseline)² across all games )</div>
+      <p>Scored on a fixed range of <b>0 (perfectly steady) to 5.0 percentage points (erratic)</b> — grounded in this team's own observed spread across its goalies, not the league file, since the league data only has season-level totals for other teams, not per-game detail to compute a real spread from. Scored on the goalie's own numbers only, not compared against other goalies — with only a handful of goalies on one roster, that comparison was too noisy to be meaningful.</p>
+    </div>
+  </div>
+</div>
+
+<script src="pipeline.js"></script>
+<script>
+function agoText(iso) {
+  if (!iso) return '';
+  const mins = Math.round((Date.now() - new Date(iso)) / 60000);
+  if (mins < 2) return 'just now'; if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.round(mins / 60); return hrs < 48 ? `${hrs}h ago` : `${Math.round(hrs / 24)}d ago`;
+}
+(async function boot() {
+  const q = new URLSearchParams(location.search);
+  const banner = document.getElementById('live-banner'), overlay = document.getElementById('live-loading');
+  const STATIC = await (await fetch('static-data.json', { cache: 'no-store' })).json();
+  let data = STATIC, liveOk = false;
+
+  // by default: just show the file a background job refreshes every couple of hours - instant, no page-open fetch
+  const last = STATIC.boxscores[STATIC.boxscores.length - 1].date;
+  const setDefaultBanner = () => { banner.className = 'ok';
+    banner.textContent = `${STATIC.boxscores.length} games \u00b7 latest ${last}` + (STATIC.lastRefreshed ? ` \u00b7 updated ${agoText(STATIC.lastRefreshed)}` : ''); };
+  setDefaultBanner();
+  if (STATIC.lastRefreshed) setInterval(() => { if (!q.get('live')) setDefaultBanner(); }, 30000);   // ticks the "Xm ago" text upward on its own
+
+  if (q.get('live')) {                                   // add ?live=1 to the URL to check Google directly, right now
+    banner.textContent = 'Checking for the latest data\u2026';
+    try {
+      data = await loadLiveData(STATIC); liveOk = true;
+      const last2 = data.boxscores[data.boxscores.length - 1].date, via = loadLiveData.info.via;
+      banner.className = 'ok';
+      banner.textContent = `Live check \u00b7 ${data.boxscores.length} games \u00b7 latest ${last2}` + (via === 'direct' ? '' : ` \u00b7 via ${via}`);
+    } catch (err) {
+      console.warn('Live check failed, showing last refresh:', err.message, err.log || '');
+      banner.className = 'warn'; banner.textContent = `Live check failed \u2014 showing last refresh (${last})`;
+    }
+  }
+
+  window.__LIVE_DATA = data; if (overlay) overlay.remove();
+  if (liveOk) {                                          // if a live check ever makes the app crash, fall back automatically
+    const guard = e => location.replace(location.pathname + '?why=' + encodeURIComponent('live check broke the page (' + String(e.message || 'error').slice(0, 100) + ')'));
+    window.addEventListener('error', guard); setTimeout(() => window.removeEventListener('error', guard), 4000);
+  }
+  const s = document.createElement('script'); s.src = 'app.js';
+  document.body.appendChild(s);
+})();
+</script>
+
+</body>
+</html>
