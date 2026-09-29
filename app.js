@@ -1273,6 +1273,8 @@ if (DATA.leagueTable && DATA.leagueTable.divisions) {
   const byName = n => (DATA.leagueTable.divisions.find(d => d.division === n) || { teams: [] }).teams;
   renderLeagueGroup('leagueZiemeli', byName('ZIEMEĻI'));
   renderLeagueGroup('leagueDienvidi', byName('DIENVIDI'));
+  const label = document.getElementById('leagueUpdatedLabel');
+  if (label) label.textContent = DATA.leagueTable.fetchedAt ? `— updated ${agoText(DATA.leagueTable.fetchedAt)}` : '';
 }
 renderTeamStats();
 
