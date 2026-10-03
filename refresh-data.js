@@ -7,10 +7,30 @@ const fs = require('fs');
 const path = require('path');
 const { csvToObjects, buildBoxscores, buildPlayers, buildRoster } = require('./pipeline.js');
 
+const CSV_URLS = {
+  data:        'https://docs.google.com/spreadsheets/d/e/2PACX-1vQZ8tBkOvTwOJO9-hnZdQKpdVB5q2PTEHPyWR7q8G1Xu1cuYnw3zKxoblh0a_jAhvUnZH9QST1WbdLU/pub?gid=2098354828&single=true&output=csv',
+  playerStats: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQZ8tBkOvTwOJO9-hnZdQKpdVB5q2PTEHPyWR7q8G1Xu1cuYnw3zKxoblh0a_jAhvUnZH9QST1WbdLU/pub?gid=493990934&single=true&output=csv',
+  roster:      'https://docs.google.com/spreadsheets/d/e/2PACX-1vQZ8tBkOvTwOJO9-hnZdQKpdVB5q2PTEHPyWR7q8G1Xu1cuYnw3zKxoblh0a_jAhvUnZH9QST1WbdLU/pub?gid=698787605&single=true&output=csv',
+};
+const EXPECT = { data: 'Match Date', playerStats: 'Player', roster: 'Name' };
+
+async function get(url, kind) {
+  const res = await fetch(url + (url.includes('?') ? '&' : '?') + '_cb=' + Date.now());
+  if (!res.ok) throw new Error(`${kind}: HTTP ${res.status}`);
+  const text = await res.text();
+  if (!text.includes(EXPECT[kind])) throw new Error(`${kind}: unexpected response (published link may have changed)`);
+  return text;
+}
+
 const LEAGUE_TABLE_URL = 'https://ehl.entuziasti.com/statistika/tabula';
 const CALENDAR_URL = 'https://ehl.entuziasti.com/kalendars';
 
 // abbreviations as used in the calendar/standings pages -> full team names
+const TEAM_ABBR = { SP2:'Sparta II', MT2:'Moltto Plus', WRS:'Warriors', ZLG:'Zemgales Leģions',
+  WF2:'Ice Wolves II', MDG:'Mad Dogs', BLC:'Blackout', STV:'Steevice', LDV:'Ledus Veči',
+  PTR:'Patrioti', NMJ:'Namejs', MTH:'Iecava/Mammoths', MZO:'Mežoņi', JUR:'Jūrmala',
+  HLG:'Huligan', PL2:'Leģendas V' };
+
 const TEAM_IDS = { LDV: '293' };   // LDV's team id, from /komandas/ledus-veci/293
 
 // the team-filtered calendar view (main_calendar.team_review) lists BOTH recent results
@@ -52,11 +72,6 @@ async function fetchTeamCalendarPost(teamAbbr) {
   if (!html.includes('team_review')) throw new Error('response did not look like the team-filtered view (form field names may differ)');
   return parseTeamCalendar(html, teamAbbr);
 }
-
-const TEAM_ABBR = { SP2:'Sparta II', MT2:'Moltto Plus', WRS:'Warriors', ZLG:'Zemgales Leģions',
-  WF2:'Ice Wolves II', MDG:'Mad Dogs', BLC:'Blackout', STV:'Steevice', LDV:'Ledus Veči',
-  PTR:'Patrioti', NMJ:'Namejs', MTH:'Iecava/Mammoths', MZO:'Mežoņi', JUR:'Jūrmala',
-  HLG:'Huligan', PL2:'Leģendas V' };
 
 function findUpcomingGames(html, teamAbbr) {
   // this ribbon is a flat list of <li class="date"> markers interleaved with game <li>s;
@@ -112,6 +127,42 @@ async function fetchUpcomingGames(teamAbbr, previous) {
   }
 }
 
+// a plain script request can get a different response than a real browser does (some sites
+// vary what they serve based on this) - a realistic header makes the request look like one
+const BROWSER_HEADERS = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36',
+  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8', 'Accept-Language': 'en-US,en;q=0.9,lv;q=0.8' };
+
+async function fetchLeagueTable(previous) {
+  try {
+    // the site's division switcher (E5 = division 400) may set a cookie a real browser
+    // carries automatically; try setting it first, then reuse it on the actual request
+    let cookie = '';
+    try {
+      const switchRes = await fetch('https://ehl.entuziasti.com/switch/division/400', { headers: BROWSER_HEADERS, redirect: 'manual' });
+      cookie = (switchRes.headers.get('set-cookie') || '').split(';')[0];
+      console.log('league table: division-switch status', switchRes.status, cookie ? '(got a cookie)' : '(no cookie set)');
+    } catch (e) { console.log('league table: division-switch request itself failed:', e.message); }
+
+    const res = await fetch(LEAGUE_TABLE_URL + '?_cb=' + Date.now(),
+      { headers: cookie ? { ...BROWSER_HEADERS, Cookie: cookie } : BROWSER_HEADERS });
+    console.log('league table: response status', res.status, '| final URL:', res.url);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const html = await res.text();
+    const divisions = parseLeagueTable(html);
+    const total = divisions.reduce((n, d) => n + d.teams.length, 0);
+    if (total < 10) {
+      // log enough of the actual response to see WHY, if this happens again
+      console.error('league table: unexpected response, first 400 chars:', html.slice(0, 400).replace(/\s+/g, ' '));
+      throw new Error(`only found ${total} teams (page layout may have changed)`);
+    }
+    console.log(`league table: ${divisions.map(d => `${d.division} (${d.teams.length})`).join(', ')}`);
+    return { divisions, fetchedAt: new Date().toISOString() };
+  } catch (err) {
+    console.error('league table fetch failed, keeping previous table:', err.message);
+    return previous || null;
+  }
+}
+
 function parseLeagueTable(html) {
   const divisions = [];
   const headerRe = /<h2 class="subtitle color-orange">([^<]+)<\/h2>/g;
@@ -136,47 +187,6 @@ function parseLeagueTable(html) {
     if (teams.length) divisions.push({ division: name, teams });
   }
   return divisions;
-}
-
-// a plain script request can get a different response than a real browser does (some sites
-// vary what they serve based on this) - a realistic header makes the request look like one
-const BROWSER_HEADERS = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36',
-  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8', 'Accept-Language': 'en-US,en;q=0.9,lv;q=0.8' };
-
-async function fetchLeagueTable(previous) {
-  try {
-    const res = await fetch(LEAGUE_TABLE_URL + '?_cb=' + Date.now(), { headers: BROWSER_HEADERS });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const html = await res.text();
-    const divisions = parseLeagueTable(html);
-    const total = divisions.reduce((n, d) => n + d.teams.length, 0);
-    if (total < 10) {
-      // log enough of the actual response to see WHY, if this happens again
-      console.error('league table: unexpected response, first 400 chars:', html.slice(0, 400).replace(/\s+/g, ' '));
-      throw new Error(`only found ${total} teams (page layout may have changed)`);
-    }
-    console.log(`league table: ${divisions.map(d => `${d.division} (${d.teams.length})`).join(', ')}`);
-    return { divisions, fetchedAt: new Date().toISOString() };
-  } catch (err) {
-    console.error('league table fetch failed, keeping previous table:', err.message);
-    return previous || null;
-  }
-}
-
-const CSV_URLS = {
-  data:        'https://docs.google.com/spreadsheets/d/e/2PACX-1vQZ8tBkOvTwOJO9-hnZdQKpdVB5q2PTEHPyWR7q8G1Xu1cuYnw3zKxoblh0a_jAhvUnZH9QST1WbdLU/pub?gid=2098354828&single=true&output=csv',
-  playerStats: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQZ8tBkOvTwOJO9-hnZdQKpdVB5q2PTEHPyWR7q8G1Xu1cuYnw3zKxoblh0a_jAhvUnZH9QST1WbdLU/pub?gid=493990934&single=true&output=csv',
-  roster:      'https://docs.google.com/spreadsheets/d/e/2PACX-1vQZ8tBkOvTwOJO9-hnZdQKpdVB5q2PTEHPyWR7q8G1Xu1cuYnw3zKxoblh0a_jAhvUnZH9QST1WbdLU/pub?gid=698787605&single=true&output=csv',
-};
-const EXPECT = { data: 'Match Date', playerStats: 'Player', roster: 'Name' };
-
-async function get(url, kind) {
-  // append a unique value so no cache between here and Google can ever serve a stale copy
-  const res = await fetch(url + (url.includes('?') ? '&' : '?') + '_cb=' + Date.now());
-  if (!res.ok) throw new Error(`${kind}: HTTP ${res.status}`);
-  const text = await res.text();
-  if (!text.includes(EXPECT[kind])) throw new Error(`${kind}: unexpected response (published link may have changed)`);
-  return text;
 }
 
 (async () => {
