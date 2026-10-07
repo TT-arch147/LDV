@@ -112,16 +112,34 @@ gameSelect.addEventListener('change', ()=>{ idx = parseInt(gameSelect.value); up
 document.getElementById('prevGame').addEventListener('click', ()=>{ if(idx>0){idx--; gameSelect.value=idx; updateNavButtons(); render();} });
 document.getElementById('nextGame').addEventListener('click', ()=>{ if(idx<filteredGames.length-1){idx++; gameSelect.value=idx; updateNavButtons(); render();} });
 
+// ---- site sections (Home / Stats / Calendar), each with its own address: #home, #stats, #calendar ----
+const STATS_VIEWS = { box:'boxView', stats:'statsView', team:'teamView', roster:'rosterView', methodology:'methodologyView' };
+let currentStatsTab = 'box';
+function showSection(sec){
+  if (!['home','stats','calendar'].includes(sec)) sec = 'home';
+  document.querySelectorAll('.main-btn').forEach(b=>b.classList.toggle('active', b.dataset.section===sec));
+  document.getElementById('homeView').classList.toggle('hidden', sec!=='home');
+  document.getElementById('calendarView').classList.toggle('hidden', sec!=='calendar');
+  document.getElementById('statsBar').classList.toggle('hidden', sec!=='stats');
+  Object.entries(STATS_VIEWS).forEach(([tab,id])=>document.getElementById(id).classList.toggle('hidden', !(sec==='stats' && tab===currentStatsTab)));
+}
+function goSection(sec){
+  if (location.hash.slice(1) === sec) showSection(sec); else location.hash = sec;   // the hashchange below does the rest
+  window.scrollTo(0, 0);
+}
+window.addEventListener('hashchange', ()=>showSection(location.hash.slice(1)));
+document.querySelectorAll('.main-btn').forEach(b=>b.addEventListener('click', ()=>goSection(b.dataset.section)));
+const brandHome = document.getElementById('brandHome');
+brandHome.addEventListener('click', ()=>goSection('home'));
+brandHome.addEventListener('keydown', e=>{ if (e.key==='Enter') goSection('home'); });
+
 document.querySelectorAll('.tab-btn').forEach(btn=>{
   btn.addEventListener('click', ()=>{
     document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
-    const tab = btn.dataset.tab;
-    document.getElementById('boxView').classList.toggle('hidden', tab!=='box');
-    document.getElementById('statsView').classList.toggle('hidden', tab!=='stats');
-    document.getElementById('teamView').classList.toggle('hidden', tab!=='team');
-    document.getElementById('rosterView').classList.toggle('hidden', tab!=='roster');
-    document.getElementById('methodologyView').classList.toggle('hidden', tab!=='methodology');
+    currentStatsTab = btn.dataset.tab;
+    if (location.hash.slice(1) !== 'stats') location.hash = 'stats';
+    showSection('stats');
   });
 });
 
@@ -1295,7 +1313,7 @@ if (DATA.leagueTable && DATA.leagueTable.divisions) {
 if (DATA.upcomingGames && DATA.upcomingGames.length) {
   const CAL_LOGO_ALIAS = { 'Warriors': 'Ice Warriors', 'Ice Wolves II': 'Ice Wolves',
     'Iecava/Mammoths': 'Mammoths', 'Leģendas V': 'Pilsētas Leģendas', 'Sparta II': 'Sparta 2', 'Moltto Plus': 'Moltto' };
-  document.getElementById('calendarBody').innerHTML = DATA.upcomingGames.map(g => {
+  document.getElementById('calendarBody').innerHTML = DATA.upcomingGames.slice(0, 1).map(g => {
     const logoObj = DATA.teamAssets && DATA.teamAssets[CAL_LOGO_ALIAS[g.opponent] || g.opponent];
     const logo = logoObj && logoObj.logo;
     const oppCell = logo ? `<img class="league-logo" src="${logo}" alt="">${g.opponent}` : g.opponent;
@@ -1313,3 +1331,298 @@ rebuildGameList();renderTeamStats();
 
 rebuildGameList();
 renderStatsTab();
+
+// ---------------- Calendar tab ----------------
+// games (played + upcoming), practices, birthdays and name days in one month view
+(function(){
+  // the regular weekly practice; extra or cancelled practices come from the Practices sheet tab
+  const PRACTICE = { weekday: 1, time: '21:15', rink: 'Akropole', seasonStart: '09-01', seasonEnd: '04-30' };   // weekday 1 = Monday
+  const SHOW_AGE = false;   // true = show the age a player is turning on their birthday
+  const TYPES = { game: 'Games', practice: 'Practices', bday: 'Birthdays', nday: 'Name days' };
+  const ORDER = { game: 0, practice: 1, bday: 2, nday: 3 };
+  const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const shown = { game: true, practice: true, bday: true, nday: true };
+
+  const pad = n => String(n).padStart(2, '0');
+  const iso = (y, m, d) => `${y}-${pad(m + 1)}-${pad(d)}`;
+  const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const titleCase = s => String(s || '').toLowerCase().replace(/(^|[\s/-])\S/g, c => c.toUpperCase());
+  const now = new Date(), todayIso = iso(now.getFullYear(), now.getMonth(), now.getDate());
+  const rosterNames = new Set(DATA.roster.map(p => p.name));
+  const firstName = n => n.split(' ')[0];
+
+  // the EHL calendar gives dates like "10. Oktobris" (no year) - turn them into YYYY-MM-DD
+  const LV_MONTHS = ['jan','feb','mar','apr','mai','jūn','jūl','aug','sep','okt','nov','dec'];
+  function upcomingIso(g){
+    const m = String(g.date || '').toLowerCase().match(/(\d{1,2})\.?\s*([a-zāčēģīķļņšūž]+)/);
+    if (!m) return null;
+    let mon = LV_MONTHS.findIndex(x => m[2].startsWith(x));
+    if (mon < 0) mon = { jun: 5, jul: 6 }[m[2].slice(0, 3)] ?? -1;
+    if (mon < 0) return null;
+    const ref = new Date(g.fetchedAt || Date.now());
+    let y = ref.getFullYear();
+    if (mon < ref.getMonth() - 2) y++;   // e.g. a January game listed in November belongs to next year
+    return iso(y, mon, +m[1]);
+  }
+
+  const fixed = [];   // events tied to one specific date
+  DATA.boxscores.forEach(b => {
+    if (!b.date) return;
+    const home = b.lvIsHome, opp = home ? b.awayTeam : b.homeTeam;
+    const us = home ? b.htGoals : b.atGoals, them = home ? b.atGoals : b.htGoals;
+    const score = us != null && us !== '' ? ` · ${us}–${them}${b.result ? ' ' + b.result : ''}` : '';
+    fixed.push({ date: b.date, type: 'game', short: `${home ? 'vs' : 'at'} ${opp}`, text: `${home ? 'vs' : 'at'} ${opp}${score}` });
+  });
+  (DATA.upcomingGames || []).forEach(g => {
+    const d = upcomingIso(g);
+    if (!d || fixed.some(f => f.type === 'game' && f.date === d)) return;
+    const where = [g.time, g.arena ? titleCase(g.arena) : ''].filter(Boolean).join(' · ');
+    fixed.push({ date: d, type: 'game', short: `${g.isHome ? 'vs' : 'at'} ${g.opponent}`, text: `${g.isHome ? 'vs' : 'at'} ${g.opponent}${where ? ' · ' + where : ''}` });
+  });
+  const extras = DATA.practiceExtras || [];
+  const cancelled = new Set(extras.filter(x => x.cancelled).map(x => x.date));
+  extras.filter(x => !x.cancelled).forEach(x => fixed.push({ date: x.date, type: 'practice',
+    short: 'Extra practice', text: ['Extra practice', x.time, x.rink, x.note].filter(Boolean).join(' · ') }));
+
+  function inSeason(md){
+    const s = PRACTICE.seasonStart, e = PRACTICE.seasonEnd;
+    return s <= e ? (md >= s && md <= e) : (md >= s || md <= e);
+  }
+
+  function eventsOn(ds){
+    const [y, m, d] = ds.split('-').map(Number), md = ds.slice(5);
+    const out = fixed.filter(e => e.date === ds);
+    if (new Date(y, m - 1, d).getDay() === PRACTICE.weekday && inSeason(md) && !cancelled.has(ds))
+      out.push({ type: 'practice', short: 'Practice', text: `Practice ${PRACTICE.time} · ${PRACTICE.rink}` });
+    Object.entries(DATA.birthdays || {}).forEach(([n, b]) => {
+      if (rosterNames.has(n) && b && b.slice(5) === md)
+        out.push({ type: 'bday', short: firstName(n), text: `Birthday: ${n}${SHOW_AGE ? ` (${y - Number(b.slice(0, 4))})` : ''}` });
+    });
+    Object.entries(DATA.nameDays || {}).forEach(([n, v]) => {
+      if (rosterNames.has(n) && v && v.d === md)
+        out.push({ type: 'nday', short: firstName(n), text: `Name day: ${n}${v.special ? ' (day of uncommon names)' : ''}` });
+    });
+    return out.filter(e => shown[e.type]).sort((a, b) => ORDER[a.type] - ORDER[b.type]);
+  }
+
+  const dayLabel = ds => { const [y, m, d] = ds.split('-').map(Number); return `${d} ${MONTHS[m - 1].slice(0, 3)}`; };
+  const rowHtml = (e, ds) => `<div class="cal-row t-${e.type}">${ds ? `<span class="when">${dayLabel(ds)}</span>` : ''}<span class="cal-dot"></span><span>${esc(e.text)}</span></div>`;
+
+  let viewY = now.getFullYear(), viewM = now.getMonth(), selected = todayIso;
+
+  function renderCalendar(){
+    document.getElementById('calTitle').textContent = `${MONTHS[viewM]} ${viewY}`;
+    document.getElementById('calFilters').innerHTML = Object.entries(TYPES).map(([k, label]) =>
+      `<button class="cal-chip t-${k}${shown[k] ? '' : ' off'}" data-type="${k}"><span class="cal-dot"></span>${label}</button>`).join('');
+
+    let html = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d => `<div class="cal-dow">${d}</div>`).join('');
+    html += '<div class="cal-day blank"></div>'.repeat((new Date(viewY, viewM, 1).getDay() + 6) % 7);
+    const days = new Date(viewY, viewM + 1, 0).getDate();
+    for (let d = 1; d <= days; d++) {
+      const ds = iso(viewY, viewM, d), ev = eventsOn(ds);
+      const cls = ['cal-day', ds === todayIso ? 'today' : '', ds === selected ? 'sel' : '', ds < todayIso ? 'past' : ''].filter(Boolean).join(' ');
+      html += `<button class="${cls}" data-date="${ds}"><span class="cal-num">${d}</span>
+        <span class="cal-items">${ev.map(e => `<span class="cal-item t-${e.type}" title="${esc(e.text)}">${esc(e.short)}</span>`).join('')}</span>
+        <span class="cal-dots">${ev.map(e => `<span class="cal-dot t-${e.type}"></span>`).join('')}</span></button>`;
+    }
+    document.getElementById('calGrid').innerHTML = html;
+
+    const selEv = eventsOn(selected);
+    document.getElementById('calDayTitle').textContent = selected === todayIso ? `Today, ${dayLabel(selected)}` : dayLabel(selected);
+    document.getElementById('calDayList').innerHTML = selEv.length ? selEv.map(e => rowHtml(e)).join('') : '<div class="empty-note">Nothing on this day</div>';
+
+    const up = [];
+    for (let i = 0; i < 120 && up.length < 10; i++) {
+      const t = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i), ds = iso(t.getFullYear(), t.getMonth(), t.getDate());
+      eventsOn(ds).forEach(e => up.push(rowHtml(e, ds)));
+    }
+    document.getElementById('calUpcoming').innerHTML = up.slice(0, 10).join('') || '<div class="empty-note">Nothing scheduled yet</div>';
+
+    document.getElementById('calNote').textContent = (!DATA.birthdays || !DATA.nameDays)
+      ? 'Birthdays and name days appear after the next data refresh.' : '';
+  }
+
+  document.getElementById('calGrid').addEventListener('click', e => {
+    const btn = e.target.closest('.cal-day[data-date]'); if (!btn) return;
+    selected = btn.dataset.date; renderCalendar();
+    if (window.innerWidth <= 860) document.getElementById('calDayPanel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  });
+  document.getElementById('calFilters').addEventListener('click', e => {
+    const chip = e.target.closest('.cal-chip'); if (!chip) return;
+    shown[chip.dataset.type] = !shown[chip.dataset.type]; renderCalendar();
+  });
+  document.getElementById('calPrev').addEventListener('click', () => { viewM--; if (viewM < 0) { viewM = 11; viewY--; } renderCalendar(); });
+  document.getElementById('calNext').addEventListener('click', () => { viewM++; if (viewM > 11) { viewM = 0; viewY++; } renderCalendar(); });
+  document.getElementById('calToday').addEventListener('click', () => { viewY = now.getFullYear(); viewM = now.getMonth(); selected = todayIso; renderCalendar(); });
+  const link = document.getElementById('openCalendarLink');
+  if (link) link.addEventListener('click', e => { e.preventDefault(); goSection('calendar'); });
+  window.calEventsOn = eventsOn;   // the home page's "This week" box reuses this
+  renderCalendar();
+})();
+
+// ---------------- Home ----------------
+// One box per club team (E5, E7, E9): next game, last results, season so far, this week.
+// E5 uses the game sheet for our own games; E7 / E9 and all opponents come from the EHL calendar
+// (DATA.club, filled in by refresh-data.js).
+(function(){
+  const CLUB = DATA.club || {};
+  const TABLES = DATA.leagueTables || { E5: DATA.leagueTable };
+  // names as the EHL calendar writes them -> names used in the game sheet / logo list
+  const ALIAS = { 'Warriors':'Ice Warriors', 'Ice Wolves II':'Ice Wolves', 'Iecava/Mammoths':'Mammoths',
+    'Leģendas V':'Pilsētas Leģendas', 'Sparta II':'Sparta 2', 'Moltto Plus':'Moltto' };
+  const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const WD = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const pad = n => String(n).padStart(2, '0');
+  const isoOf = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  const fmt = s => { const [y,m,d] = s.split('-').map(Number); return `${WD[new Date(y,m-1,d).getDay()]} ${d} ${MON[m-1]}`; };
+  const tc = s => String(s||'').toLowerCase().replace(/(^|[\s/-])\S/g, c => c.toUpperCase());
+  const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
+  const ord = n => n + (n===1 ? 'st' : n===2 ? 'nd' : n===3 ? 'rd' : 'th');
+  const plain = s => String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
+  const now = new Date(), today = new Date(now.getFullYear(), now.getMonth(), now.getDate()), todayIso = isoOf(today);
+  const res = (a, b) => a > b ? 'W' : a < b ? 'L' : 'D';
+
+  const pos = (div, name) => {
+    for (const d of ((TABLES[div] && TABLES[div].divisions) || [])) {
+      const i = d.teams.findIndex(t => plain(t.team) === plain(name) || plain(t.team) === plain(ALIAS[name]));
+      if (i >= 0) return { n: i + 1, pts: d.teams[i].points, div: tc(d.division) };
+    }
+    return null;
+  };
+  const initials = n => String(n).split(/\s+/).filter(Boolean).map(w => w[0]).join('').slice(0, 3).toUpperCase();
+  const logoHtml = (src, name, size) => src ? `<img src="${src}" alt="" style="width:${size}px;height:${size}px;object-fit:contain">`
+    : `<div class="ph-logo" style="width:${size}px;height:${size}px;font-size:${Math.round(size / 3)}px">${esc(initials(name))}</div>`;
+  const knownLogo = name => { const i = teamInfo(ALIAS[name] || name); return i && i.logo ? i.logo : null; };
+  const ldvLogo = teamLogo('Ledus Veči');
+
+  // one team's EHL games from that team's point of view
+  function ehlPersp(g, abbr, names){
+    const home = g.home.abbr === abbr, us = home ? g.home : g.away, them = home ? g.away : g.home;
+    return { date: g.date, home, opp: names[them.abbr] || them.abbr, oppAbbr: them.abbr,
+      us: home ? g.hg : g.ag, them: home ? g.ag : g.hg, result: g.played ? res(home ? g.hg : g.ag, home ? g.ag : g.hg) : null, link: g.protocol };
+  }
+
+  // ---- build the same shape for every team ----
+  function modelE5(){
+    const games = DATA.boxscores.filter(b => b.date).slice().sort((a, b) => a.date < b.date ? -1 : 1);
+    const persp = b => { const h = b.lvIsHome; return { date: b.date, home: h, opp: h ? b.awayTeam : b.homeTeam,
+      us: h ? b.htGoals : b.atGoals, them: h ? b.atGoals : b.htGoals, result: b.result, link: '#box:' + b.date }; };
+    const LV_MONTHS = ['jan','feb','mar','apr','mai','jūn','jūl','aug','sep','okt','nov','dec'];
+    const gameDate = g => { const m = String(g.date||'').toLowerCase().match(/(\d{1,2})\.?\s*([a-zāčēģīķļņšūž]+)/); if (!m) return null;
+      const mi = LV_MONTHS.findIndex(x => m[2].startsWith(x)); if (mi < 0) return null;
+      const ref = new Date(g.fetchedAt || Date.now()); let y = ref.getFullYear(); if (mi < ref.getMonth() - 2) y++; return isoOf(new Date(y, mi, +m[1])); };
+    const up = (DATA.upcomingGames || []).map(g => ({ g, d: gameDate(g) })).filter(x => x.d && x.d >= todayIso).sort((a, b) => a.d < b.d ? -1 : 1)[0];
+    const played = games.map(persp);
+    const last = played[played.length - 1];
+    const yrs = last ? ((games[games.length - 1].season.match(/\d{4}-\d{4}/) || [''])[0]) : '';
+    const season = games.filter(b => b.season.includes(yrs)).map(persp);
+    const next = up && { date: up.d, time: up.g.time, arena: up.g.arena ? tc(up.g.arena) : '', home: up.g.isHome, opp: up.g.opponent };
+    const h2h = next ? played.filter(p => p.opp === next.opp || p.opp === ALIAS[next.opp]) : [];
+    const opp = CLUB.E5 && CLUB.E5.opponent && next && plain(CLUB.E5.opponent.name) === plain(next.opp) ? CLUB.E5.opponent : (CLUB.E5 && CLUB.E5.opponent);
+    return { div: 'E5', name: 'Ledus Veči', logo: ldvLogo, played, season, next, h2h, h2hLink: true,
+      oppPlayed: oppGames(opp, CLUB.E5), oppLogo: next ? knownLogo(next.opp) : null };
+  }
+  function oppGames(opp, team){
+    if (!opp || !opp.games) return [];
+    const names = Object.assign({}, team && team.names, { [opp.abbr]: opp.name });
+    return opp.games.filter(g => g.played && g.date).sort((a, b) => a.date < b.date ? -1 : 1).map(g => ehlPersp(g, opp.abbr, names));
+  }
+  function modelEhl(div){
+    const t = CLUB[div]; if (!t || !t.abbr) return null;
+    const names = t.names || {};
+    const games = (t.games || []).filter(g => g.date).sort((a, b) => a.date < b.date ? -1 : 1);
+    const played = games.filter(g => g.played).map(g => ehlPersp(g, t.abbr, names));
+    const nx = games.find(g => !g.played && g.date >= todayIso);
+    const next = nx && (p => ({ date: nx.date, time: nx.time, arena: nx.arena ? tc(nx.arena) : '', home: p.home,
+      opp: (t.opponent && t.opponent.abbr === p.oppAbbr) ? t.opponent.name : p.opp }))(ehlPersp(nx, t.abbr, names));
+    const oppAbbr = nx ? ehlPersp(nx, t.abbr, names).oppAbbr : null;
+    return { div, name: t.name, logo: ldvLogo, played, season: played, next,
+      h2h: played.filter(p => p.oppAbbr === oppAbbr), h2hLink: false,
+      oppPlayed: oppGames(t.opponent, t), oppLogo: null, ehlUpcoming: games.filter(g => !g.played) };
+  }
+
+  // ---- this week (Mon-Sun): games, the shared practice, players' birthdays and name days ----
+  const monday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - (today.getDay() + 6) % 7);
+  function weekRows(t){
+    const rows = [];
+    const R = DATA.teamRosters || {};
+    const people = t.div === 'E5' ? [] : ((R.teams && R.teams[t.div]) || []).map(id => R.people[id]).filter(Boolean);
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i), ds = isoOf(d), md = ds.slice(5);
+      let ev;
+      if (t.div === 'E5') ev = window.calEventsOn ? window.calEventsOn(ds) : [];
+      else {
+        ev = (window.calEventsOn ? window.calEventsOn(ds) : []).filter(e => e.type === 'practice');
+        (t.ehlUpcoming || []).filter(g => g.date === ds).forEach(g => { const p = ehlPersp(g, CLUB[t.div].abbr, CLUB[t.div].names || {});
+          ev.unshift({ type: 'game', text: [`${p.home ? 'vs' : 'at'} ${p.opp}`, g.time, g.arena ? tc(g.arena) : ''].filter(Boolean).join(' · ') }); });
+        people.forEach(p => {
+          if (p.birthday && p.birthday.slice(5) === md) ev.push({ type: 'bday', text: `Birthday: ${p.name}` });
+          if (p.nameDay && p.nameDay.d === md) ev.push({ type: 'nday', text: `Name day: ${p.name}${p.nameDay.special ? ' (day of uncommon names)' : ''}` });
+        });
+      }
+      ev.forEach(e => rows.push(`<div class="cal-row t-${e.type}"${ds < todayIso ? ' style="opacity:.45"' : ''}><span class="when">${ds === todayIso ? 'Today' : WD[d.getDay()]}</span><span class="cal-dot"></span><span>${esc(e.text)}</span></div>`));
+    }
+    return rows.join('') || '<div class="empty-note">Nothing on this week</div>';
+  }
+
+  // ---- render one team box ----
+  const form = (list, away) => `<div class="match-form">${away ? '' : '<span class="lbl5" style="margin-left:0">Last 5</span>'}${list.slice(-5).map(p => `<span class="f ${p.result}">${p.result}</span>`).join('')}${away ? '<span class="lbl5" style="margin-right:0">Last 5</span>' : ''}</div>`;
+  const boxLink = (link, label) => !link ? '' : link.startsWith('#box:')
+    ? `<a href="#stats" data-boxdate="${link.slice(5)}">${label}</a>` : `<a href="${link}" target="_blank" rel="noopener">${label}</a>`;
+  const resRow = (logo, name, p) => !p ? '' : `<div class="res-row">${logoHtml(logo, name, 30)}<div style="min-width:0">
+      <div class="line">${esc(name === 'Ledus Veči' || name.startsWith('Ledus Veči ') ? '' : name + ' ')}${p.home ? 'vs' : 'at'} ${esc(p.opp)} ${p.us}-${p.them}<span class="home-res ${p.result}">${p.result}</span></div>
+      <div class="home-sub">${fmt(p.date)}${p.link ? ' · ' + boxLink(p.link, 'Boxscore') : ''}</div></div></div>`;
+
+  function block(t){
+    if (!t) return '';
+    const n = t.next, us = pos(t.div, t.name);
+    let matchHtml;
+    if (n) {
+      const nd = n.date.split('-').map(Number), days = Math.round((new Date(nd[0], nd[1] - 1, nd[2]) - today) / 864e5);
+      const cd = days === 0 ? 'Today' : days === 1 ? 'Tomorrow' : `In ${days} days`;
+      const side = (name, logo, p, list, away) => `<div class="match-team${away ? ' away' : ''}">${logoHtml(logo, name, 72)}<div><div class="match-name">${esc(name)}</div>${p ? `<div class="match-pos">${ord(p.n)} in ${esc(p.div)} · ${p.pts} pts</div>` : ''}${list.length ? form(list, away) : ''}</div></div>`;
+      const mine = [t.name, t.logo, us, t.played], theirs = [n.opp, t.oppLogo, pos(t.div, n.opp), t.oppPlayed];
+      const [L, R] = n.home ? [mine, theirs] : [theirs, mine];
+      const w = t.h2h.filter(p => p.result === 'W').length, l = t.h2h.filter(p => p.result === 'L').length;
+      const lm = t.h2h[t.h2h.length - 1];
+      matchHtml = `<div class="match-top"><div><div class="match-label"><span class="div-badge">${t.div}</span><span class="league-group-title" style="margin:0">Next game</span></div>
+          <div class="match-when">${[fmt(n.date), n.time, n.arena].filter(Boolean).join(' · ')}</div></div><span class="countdown">${cd}</span></div>
+        <div class="match-teams">${side(...L)}<div class="match-vs">VS</div>${side(...R, true)}</div>
+        <div class="match-foot">${t.h2h.length ? `<span>Head-to-head <b>${w}-${l}</b></span>${lm ? `<span>Last meeting <b>${lm.us}-${lm.them} ${lm.result}</b>, ${fmt(lm.date)} ${lm.date.slice(0, 4)}${lm.link ? ' · ' + boxLink(lm.link, 'Boxscore') : ''}</span>` : ''}` : '<span>First meeting</span>'}</div>`;
+    } else {
+      matchHtml = `<div class="match-label"><span class="div-badge">${t.div}</span><span class="league-group-title" style="margin:0">Next game</span></div><div class="empty-note">No upcoming games in the EHL calendar yet</div>`;
+    }
+    const lastUs = t.played[t.played.length - 1], lastThem = t.oppPlayed[t.oppPlayed.length - 1];
+    const W = t.season.filter(p => p.result === 'W').length, Lc = t.season.filter(p => p.result === 'L').length;
+    return `<section class="team-block">
+      <div class="match">${matchHtml}</div>
+      <div class="home-row">
+        <div class="panel"><div class="league-group-title">Last results</div>${resRow(t.logo, t.name, lastUs)}${n ? resRow(t.oppLogo, n.opp, lastThem) : ''}${!lastUs && !lastThem ? '<div class="empty-note">No games played yet</div>' : ''}</div>
+        <div class="panel"><div class="league-group-title">Season so far</div><div class="home-big">${W}-${Lc}${us ? ` · ${ord(us.n)}` : ''}</div>
+          <div class="home-sub">${t.season.length} games${us ? ` · ${us.pts} pts in ${esc(us.div)}` : ''}</div>
+          <div class="home-form">${t.season.slice(-5).map(p => `<span class="${p.result}">${p.result}</span>`).join('')}</div></div>
+        <div class="panel"><div class="league-group-title">This week</div>${weekRows(t)}</div>
+      </div></section>`;
+  }
+
+  const blocks = [];
+  try { blocks.push(block(modelE5())); } catch (e) { console.error('home E5:', e); }
+  ['E7', 'E9'].forEach(div => { try { blocks.push(block(modelEhl(div))); } catch (e) { console.error('home ' + div + ':', e); } });
+  document.getElementById('teamBlocks').innerHTML = blocks.join('');
+
+  // Boxscore links for our own E5 games open that game in Stats > Boxscore
+  document.getElementById('teamBlocks').addEventListener('click', e => {
+    const a = e.target.closest('a[data-boxdate]'); if (!a) return;
+    e.preventDefault();
+    const sel = document.getElementById('gameSelect');
+    const find = () => sel && [...sel.options].find(o => o.textContent.startsWith(a.dataset.boxdate));
+    let opt = find();
+    const ss = document.getElementById('seasonSelect');
+    if (!opt && ss && [...ss.options].some(o => o.value === 'ALL')) { ss.value = 'ALL'; ss.dispatchEvent(new Event('change')); opt = find(); }
+    if (opt) { sel.value = opt.value; sel.dispatchEvent(new Event('change')); }
+    document.querySelector('.tab-btn[data-tab="box"]').click(); window.scrollTo(0, 0);
+  });
+  // sponsor boxes without a website yet are not clickable
+  document.querySelectorAll('.sponsor').forEach(a => { if (!a.getAttribute('href')) { a.removeAttribute('href'); a.style.cursor = 'default'; } });
+})();
+showSection(location.hash.slice(1) || 'home');
