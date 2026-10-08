@@ -1,0 +1,28 @@
+name: Collect EHL history
+
+on:
+  workflow_dispatch: {}      # only runs when you press "Run workflow" on the Actions tab
+
+permissions:
+  contents: write
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node collect-history.js
+      - name: Save the results to the repo
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add history
+          git diff --staged --quiet && exit 0
+          git commit -m "Collect EHL history"
+          git pull --rebase
+          git push
