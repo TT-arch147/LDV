@@ -113,8 +113,8 @@ document.getElementById('prevGame').addEventListener('click', ()=>{ if(idx>0){id
 document.getElementById('nextGame').addEventListener('click', ()=>{ if(idx<filteredGames.length-1){idx++; gameSelect.value=idx; updateNavButtons(); render();} });
 
 // ---- site sections (Home / Stats / Calendar), each with its own address: #home, #stats, #calendar ----
-const STATS_VIEWS = { box:'boxView', stats:'statsView', team:'teamView', roster:'rosterView', methodology:'methodologyView' };
-let currentStatsTab = 'box';
+const STATS_VIEWS = { overview:'overviewView', box:'boxView', stats:'statsView', team:'teamView', roster:'rosterView', methodology:'methodologyView' };
+let currentStatsTab = 'overview';
 function showSection(sec){
   if (!['home','stats','calendar'].includes(sec)) sec = 'home';
   document.querySelectorAll('.main-btn').forEach(b=>b.classList.toggle('active', b.dataset.section===sec));
@@ -1460,6 +1460,103 @@ renderStatsTab();
   renderCalendar();
 })();
 
+// ---------------- Ledus Veči stats > Overview ----------------
+// One screen: games (results / upcoming), player scoring, goalies and the E5 table.
+(function(){
+  const el = document.getElementById('overviewView'); if (!el) return;
+  const LV = 'Ledus Veči';
+  const ALIAS = { 'Warriors':'Ice Warriors', 'Ice Wolves II':'Ice Wolves', 'Iecava/Mammoths':'Mammoths',
+    'Leģendas V':'Pilsētas Leģendas', 'Sparta II':'Sparta 2', 'Moltto Plus':'Moltto' };
+  const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const LV_MONTHS = ['jan','feb','mar','apr','mai','jūn','jūl','aug','sep','okt','nov','dec'];
+  const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
+  const up = s => String(s || '').trim().toUpperCase();
+  const nice = s => String(s || '').toLowerCase().replace(/(^|[\s/-])\S/g, c => c.toUpperCase()).replace(/\b(Ii|Iii|Iv|Vi)\b/g, m => m.toUpperCase());
+  const ord = n => n + (n === 1 ? 'st' : n === 2 ? 'nd' : n === 3 ? 'rd' : 'th');
+  const shortDate = iso => { const [, m, d] = iso.split('-').map(Number); return `${d} ${MON[m - 1]}`; };
+  const assetKey = {}; Object.keys(DATA.teamAssets || {}).forEach(k => assetKey[up(k)] = k);
+  const logoSrc = name => { const k = assetKey[up(name)] || assetKey[up(ALIAS[name])] || assetKey[up(ALIAS[nice(name)])]; return k ? teamLogo(k) : null; };
+  const logo = name => { const src = logoSrc(name); return src ? `<img class="tlogo" src="${src}" alt="">` : ''; };
+  const chips = (names, on) => `<div class="grp-chips">${names.map((n, i) => `<button data-i="${i}" class="${i === on ? 'on' : ''}">${esc(n)}</button>`).join('')}</div>`;
+  const parts = (bodies, on) => bodies.map((b, i) => `<div class="ov-part" data-i="${i}"${i === on ? '' : ' style="display:none"'}>${b}</div>`).join('');
+
+  // this season = the season of our latest game (regular season and playoffs)
+  const all = DATA.boxscores.filter(b => b.date).slice().sort((x, y) => x.date < y.date ? -1 : 1);
+  if (!all.length) { el.innerHTML = '<div class="empty-note" style="padding:20px 0">No games yet</div>'; return; }
+  const yrs = (all[all.length - 1].season.match(/\d{4}-\d{4}/) || [''])[0];
+  const games = all.filter(b => b.season.includes(yrs)).map(b => { const h = b.lvIsHome;
+    return { date: b.date, home: h, opp: h ? b.awayTeam : b.homeTeam, us: h ? b.htGoals : b.atGoals, them: h ? b.atGoals : b.htGoals, r: b.result }; });
+  const W = games.filter(g => g.r === 'W').length, L = games.filter(g => g.r === 'L').length;
+  const GF = games.reduce((s, g) => s + (+g.us || 0), 0), GA = games.reduce((s, g) => s + (+g.them || 0), 0);
+
+  const divs = (DATA.leagueTable && DATA.leagueTable.divisions) || [];
+  const ourDiv = Math.max(0, divs.findIndex(d => d.teams.some(t => up(t.team) === up(LV))));
+  const ourPos = divs[ourDiv] ? divs[ourDiv].teams.findIndex(t => up(t.team) === up(LV)) : -1;
+
+  // player scoring: points, then goals, then +/-, then fewer games played
+  const sk = {};
+  DATA.skaterRows.filter(r => r.season.includes(yrs)).forEach(r => { const p = sk[r.player] || (sk[r.player] = { gp: 0, g: 0, a: 0, pm: 0, pim: 0 });
+    p.gp++; p.g += r.g || 0; p.a += r.a || 0; p.pm += r.pm || 0; p.pim += r.pim || 0; });
+  const skaters = Object.entries(sk).map(([n, p]) => ({ n, ...p, p: p.g + p.a }))
+    .sort((x, y) => y.p - x.p || y.g - x.g || y.pm - x.pm || x.gp - y.gp || x.n.localeCompare(y.n));
+  const gl = {};
+  (DATA.goalieRows || []).filter(r => r.season.includes(yrs)).forEach(r => { const g = gl[r.player] || (gl[r.player] = { gp: 0, sa: 0, sv: 0, ga: 0 });
+    g.gp++; g.sa += r.shotsFaced || 0; g.sv += r.saves || 0; g.ga += r.ga || 0; });
+
+  // upcoming games from the EHL calendar ("10. Oktobris" -> date)
+  const upIso = g => { const m = String(g.date || '').toLowerCase().match(/(\d{1,2})\.?\s*([a-zāčēģīķļņšūž]+)/); if (!m) return null;
+    const mi = LV_MONTHS.findIndex(x => m[2].startsWith(x)); if (mi < 0) return null;
+    const ref = new Date(g.fetchedAt || Date.now()); let y = ref.getFullYear(); if (mi < ref.getMonth() - 2) y++;
+    return `${y}-${String(mi + 1).padStart(2, '0')}-${String(+m[1]).padStart(2, '0')}`; };
+  const today = new Date().toISOString().slice(0, 10);
+  const upcoming = (DATA.upcomingGames || []).map(g => ({ g, d: upIso(g) })).filter(x => x.d && x.d >= today).sort((x, y) => x.d < y.d ? -1 : 1).slice(0, 6);
+
+  const sign = n => n > 0 ? '+' + n : String(n);
+  const resultsHtml = `<div class="scroll-x"><table class="ovt"><tr><th>Date</th><th>Opponent</th><th class="num">Score</th><th></th></tr>
+    ${games.slice().reverse().map(g => `<tr><td>${shortDate(g.date)}</td><td>${g.home ? 'vs' : '@'} ${logo(g.opp)}${esc(g.opp)}</td>
+      <td class="num">${g.us}-${g.them}<span class="r ${g.r}">${g.r}</span></td><td class="num"><a href="#stats" data-boxdate="${g.date}">Boxscore</a></td></tr>`).join('')}</table></div>`;
+  const upcomingHtml = upcoming.map(({ g, d }) => `<div class="ov-up"><span class="when">${shortDate(d)}</span>
+    <span>${g.isHome ? 'vs' : '@'} ${logo(g.opponent)}${esc(g.opponent)}${g.time ? ' · ' + g.time : ''}${g.arena ? ' · ' + esc(nice(g.arena)) : ''}</span></div>`).join('')
+    || '<div class="empty-note">Nothing scheduled yet</div>';
+  const scoringRows = skaters.map((p, i) => `<tr${i >= 10 ? ' class="extra" style="display:none"' : ''}><td class="name">${esc(p.n)}</td><td class="num">${p.gp}</td><td class="num">${p.g}</td>
+    <td class="num">${p.a}</td><td class="num"><b>${p.p}</b></td><td class="num">${sign(p.pm)}</td><td class="num">${p.pim}</td></tr>`).join('');
+  const goalies = Object.entries(gl);
+  const tableHtml = d => `<table class="ovt"><tr><th>#</th><th>Team</th><th class="num">GP</th><th class="num">PTS</th></tr>
+    ${d.teams.map((t, i) => `<tr class="${up(t.team) === up(LV) ? 'me' : ''}"><td>${i + 1}</td><td class="name">${logo(t.team)}${esc(nice(t.team))}</td><td class="num">${t.gp ?? ''}</td><td class="num">${t.points ?? ''}</td></tr>`).join('')}</table>`;
+
+  el.innerHTML = `
+    <div class="ov-head"><img src="${teamLogo(LV)}" alt=""><div><div style="display:flex;align-items:center;gap:10px"><span class="div-badge">E5</span><span class="ov-title">${LV}</span></div>
+      <div class="ov-sub">Season ${yrs} · from our game sheet</div></div>
+      <div class="ov-stats"><div class="ov-stat"><b>${W}-${L}</b><span>Record</span></div>
+        <div class="ov-stat"><b>${ourPos >= 0 ? ord(ourPos + 1) : '-'}</b><span>${ourPos >= 0 ? esc(nice(divs[ourDiv].division)) : 'E5'}</span></div>
+        <div class="ov-stat"><b>${ourPos >= 0 ? divs[ourDiv].teams[ourPos].points : '-'}</b><span>Points</span></div>
+        <div class="ov-stat"><b>${GF}-${GA}</b><span>Goals</span></div></div></div>
+    <div class="ov-grid">
+      <div>
+        <div class="panel ov-switch"><div class="panel-head"><span class="league-group-title">Games</span>${chips(['Results', 'Upcoming'], 0)}</div>${parts([resultsHtml, upcomingHtml], 0)}</div>
+        ${goalies.length ? `<div class="panel"><div class="panel-head"><span class="league-group-title">Goalies</span></div><table class="ovt"><tr><th>Goalie</th><th class="num">GP</th><th class="num">SA</th><th class="num">SV</th><th class="num">GA</th><th class="num">SV%</th></tr>
+          ${goalies.map(([n, g]) => `<tr><td class="name">${esc(n)}</td><td class="num">${g.gp}</td><td class="num">${g.sa}</td><td class="num">${g.sv}</td><td class="num">${g.ga}</td><td class="num"><b>${g.sa ? (100 * g.sv / g.sa).toFixed(1) + '%' : '-'}</b></td></tr>`).join('')}</table></div>` : ''}
+      </div>
+      <div>
+        <div class="panel"><div class="panel-head"><span class="league-group-title">Player scoring</span></div><div class="scroll-x"><table class="ovt" id="ovScoring"><tr><th>Player</th><th class="num">GP</th><th class="num">G</th><th class="num">A</th><th class="num">P</th><th class="num">+/-</th><th class="num">PIM</th></tr>${scoringRows}</table></div>
+          ${skaters.length > 10 ? `<button class="more-btn" id="ovMore">Show all ${skaters.length} players</button>` : ''}</div>
+      </div>
+      <div>
+        ${divs.length ? `<div class="panel ov-switch"><div class="panel-head"><span class="league-group-title">E5 table</span>${divs.length > 1 ? chips(divs.map(d => nice(d.division)), ourDiv) : ''}</div>${parts(divs.map(tableHtml), ourDiv)}</div>` : ''}
+      </div>
+    </div>`;
+
+  el.addEventListener('click', e => {
+    const b = e.target.closest('.ov-switch .grp-chips button');
+    if (b) { const box = b.closest('.ov-switch');
+      box.querySelectorAll('.grp-chips button').forEach(x => x.classList.toggle('on', x === b));
+      box.querySelectorAll('.ov-part').forEach(d => d.style.display = d.dataset.i === b.dataset.i ? '' : 'none'); }
+    if (e.target.id === 'ovMore') { const open = e.target.dataset.open !== '1';
+      el.querySelectorAll('#ovScoring tr.extra').forEach(r => r.style.display = open ? '' : 'none');
+      e.target.dataset.open = open ? '1' : '0'; e.target.textContent = open ? 'Show top 10' : `Show all ${skaters.length} players`; }
+  });
+})();
+
 // ---------------- Home ----------------
 // One box per club team (E5, E7, E9): next game, last results, season so far, this week.
 // E5 uses the game sheet for our own games; E7 / E9 and all opponents come from the EHL calendar
@@ -1594,15 +1691,19 @@ renderStatsTab();
     }
     const lastUs = t.played[t.played.length - 1], lastThem = t.oppPlayed[t.oppPlayed.length - 1];
     const W = t.season.filter(p => p.result === 'W').length, Lc = t.season.filter(p => p.result === 'L').length;
-    return `<section class="team-block">
+    // Last results / Season so far / This week share one box with a switch, next to the Next game card
+    const tabs = [
+      ['Last results', `${resRow(t.logo, t.name, lastUs)}${n ? resRow(t.oppLogo, n.opp, lastThem) : ''}${!lastUs && !lastThem ? '<div class="empty-note">No games played yet</div>' : ''}`],
+      ['Season so far', `<div class="home-big">${W}-${Lc}${us ? ` · ${ord(us.n)}` : ''}</div>
+        <div class="home-sub">${t.season.length} games${us ? ` · ${us.pts} pts in ${esc(us.div)}` : ''}</div>
+        <div class="home-form">${t.season.slice(-5).map(p => `<span class="${p.result}">${p.result}</span>`).join('')}</div>`],
+      ['This week', weekRows(t)],
+    ];
+    return `<section class="team-block"><div class="home-top">
       <div class="match">${matchHtml}</div>
-      <div class="home-row">
-        <div class="panel"><div class="league-group-title">Last results</div>${resRow(t.logo, t.name, lastUs)}${n ? resRow(t.oppLogo, n.opp, lastThem) : ''}${!lastUs && !lastThem ? '<div class="empty-note">No games played yet</div>' : ''}</div>
-        <div class="panel"><div class="league-group-title">Season so far</div><div class="home-big">${W}-${Lc}${us ? ` · ${ord(us.n)}` : ''}</div>
-          <div class="home-sub">${t.season.length} games${us ? ` · ${us.pts} pts in ${esc(us.div)}` : ''}</div>
-          <div class="home-form">${t.season.slice(-5).map(p => `<span class="${p.result}">${p.result}</span>`).join('')}</div></div>
-        <div class="panel"><div class="league-group-title">This week</div>${weekRows(t)}</div>
-      </div></section>`;
+      <div class="panel combo"><div class="grp-chips">${tabs.map((x, i) => `<button data-i="${i}" class="${i === 0 ? 'on' : ''}">${x[0]}</button>`).join('')}</div>
+        ${tabs.map((x, i) => `<div class="combo-body" data-i="${i}"${i ? ' style="display:none"' : ''}>${x[1]}</div>`).join('')}</div>
+    </div></section>`;
   }
 
   const blocks = [];
@@ -1610,8 +1711,14 @@ renderStatsTab();
   ['E7', 'E9'].forEach(div => { try { blocks.push(block(modelEhl(div))); } catch (e) { console.error('home ' + div + ':', e); } });
   document.getElementById('teamBlocks').innerHTML = blocks.join('');
 
-  // Boxscore links for our own E5 games open that game in Stats > Boxscore
   document.getElementById('teamBlocks').addEventListener('click', e => {
+    const b = e.target.closest('.combo .grp-chips button'); if (!b) return;
+    const box = b.closest('.combo');
+    box.querySelectorAll('.grp-chips button').forEach(x => x.classList.toggle('on', x === b));
+    box.querySelectorAll('.combo-body').forEach(d => d.style.display = d.dataset.i === b.dataset.i ? '' : 'none');
+  });
+  // Boxscore links for our own E5 games (home page and Overview) open that game in Stats > Boxscore
+  document.addEventListener('click', e => {
     const a = e.target.closest('a[data-boxdate]'); if (!a) return;
     e.preventDefault();
     const sel = document.getElementById('gameSelect');
