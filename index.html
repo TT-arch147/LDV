@@ -378,7 +378,7 @@ footer{text-align:center;color:var(--text-faint);font-size:12px;padding:20px;}
 .subtabs .tab-btn.active{background:none;color:var(--text);border-bottom-color:var(--ice);}
 
 /* ---- home ---- */
-.home{padding-top:24px;padding-bottom:4px;}
+#homeView.home{padding-top:24px;padding-bottom:4px;}
 .team-block{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:24px;position:relative;overflow:hidden;}
 .team-block::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--ice);}
 .team-block .match,.team-block .panel{background:var(--panel2);}
@@ -519,6 +519,350 @@ footer{text-align:center;color:var(--text-faint);font-size:12px;padding:20px;}
   .ov-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;width:100%;margin-left:0;}
   .ov-stat{min-width:0;padding:6px 4px;}
 }
+
+/* ---- boxscore: two panels per row ---- */
+.bx-pair{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:stretch;margin-bottom:20px;}
+.bx-pair>.panel,.bx-pair>.scoreboard{margin:0;}
+.bx-top .scoreboard{display:flex;flex-direction:column;justify-content:center;}
+@media (max-width:900px){.bx-pair{grid-template-columns:1fr;}}
+
+/* ---- starting lineup: photo on the left ---- */
+.slot{display:grid;grid-template-columns:44px minmax(0,1fr);column-gap:10px;align-items:center;text-align:left;padding:8px 10px;}
+.slot .slot-photo{grid-row:1 / span 3;width:44px;height:44px;margin:0;}
+.slot .slot-label,.slot .slot-name,.slot .slot-stat{grid-column:2;}
+.slot .slot-name{white-space:normal;}
+
+/* ---- player stats: opponent with home/away and logo ---- */
+.opp-cell{white-space:nowrap;}
+.opp-cell .ha{display:inline-block;min-width:20px;color:var(--text-dim);}
+.opp-cell img{width:18px;height:18px;object-fit:contain;vertical-align:-4px;margin-right:6px;}
+
+/* ---- review round: overview titles, stat boxes, lineup, scoreboard ---- */
+.ov-grid .league-group-title{font-size:15px;letter-spacing:.5px;}
+.ov-stat{padding:10px 18px;min-width:110px;}
+.ov-stat b{font-size:24px;}
+.ov-stat span{font-size:11px;}
+.sb-team-tag{display:none;}
+.goal-cols{align-items:start;}
+.slot{grid-template-columns:auto auto;justify-content:center;min-height:78px;padding:12px 14px;}
+.slot .slot-photo{width:50px;height:50px;}
+
+/* ---- review round 2 ---- */
+.ov-stats{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;}
+.ov-stat{min-width:0;}
+.bx-pair{grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);}
+.ts-pair{grid-template-columns:minmax(0,1fr) minmax(0,1fr);}
+.ts-pair .record-strip{grid-template-columns:repeat(3,1fr);margin:12px 0 0;}
+.highlight-toggle{display:inline-flex;gap:10px;font-size:14px;}
+.highlight-toggle input{width:20px !important;min-width:0 !important;height:20px;margin:0;padding:0;flex:0 0 auto !important;}
+.card-photo{width:200px;}
+.card-stat{min-width:56px;}
+.card-stat-num{font-size:26px;}
+.card-stat-label{font-size:11px;}
+/* lineup on an ice rink */
+.rink{position:relative;max-width:980px;margin:0 auto;padding:34px 26px 30px;border:3px solid #3A4757;border-radius:70px;
+  background:
+    radial-gradient(circle at 50% calc(100% - 18px), rgba(1,183,240,.20) 0 62px, rgba(225,90,90,.55) 63px 65px, transparent 66px),
+    linear-gradient(to bottom, transparent calc(100% - 20px), rgba(225,90,90,.55) calc(100% - 20px), rgba(225,90,90,.55) calc(100% - 17px), transparent calc(100% - 17px)),
+    linear-gradient(to bottom, transparent 6px, rgba(225,90,90,.45) 6px, rgba(225,90,90,.45) 10px, transparent 10px),
+    linear-gradient(to bottom, transparent 30%, rgba(1,183,240,.35) 30%, rgba(1,183,240,.35) calc(30% + 5px), transparent calc(30% + 5px)),
+    linear-gradient(to bottom, transparent 64%, rgba(1,183,240,.35) 64%, rgba(1,183,240,.35) calc(64% + 5px), transparent calc(64% + 5px)),
+    linear-gradient(180deg, #0F1922, #0C141B);}
+.rink-row{max-width:760px;margin:0 auto 14px;gap:14px;}
+.rink-row.def{max-width:500px;margin:0 auto 14px;}
+.rink-row.gk{max-width:250px;margin:18px auto 30px;}
+.slot{min-height:96px;background:rgba(22,29,39,.92);}
+/* season picker with badges */
+.season-dd{position:relative;display:inline-block;}
+.season-dd-btn{display:flex;align-items:center;gap:10px;background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:8px;
+  padding:6px 12px 6px 8px;font:500 13.5px 'Inter',sans-serif;cursor:pointer;min-width:220px;}
+.season-dd-btn img,.season-dd-menu img{width:30px;height:30px;object-fit:contain;flex-shrink:0;}
+.season-dd-btn .ph,.season-dd-menu .ph{width:30px;height:30px;flex-shrink:0;}
+.season-dd-btn .caret{margin-left:auto;color:var(--text-dim);}
+.season-dd-menu{position:absolute;z-index:50;top:calc(100% + 4px);left:0;min-width:100%;background:var(--panel);border:1px solid var(--line);border-radius:10px;
+  padding:6px;box-shadow:0 10px 30px rgba(0,0,0,.45);display:none;max-height:420px;overflow:auto;}
+.season-dd.open .season-dd-menu{display:block;}
+.season-dd-menu .grp{font:600 12px 'Oswald',sans-serif;color:var(--text-dim);letter-spacing:.4px;padding:8px 8px 4px;}
+.season-dd-menu button{display:flex;align-items:center;gap:10px;width:100%;background:none;border:none;color:var(--text);font:500 13.5px 'Inter',sans-serif;
+  padding:6px 8px;border-radius:6px;cursor:pointer;text-align:left;}
+.season-dd-menu button:hover{background:var(--panel2);}
+.season-dd-menu button.on{background:rgba(131,12,103,.25);}
+#seasonNavLogo,#teamSeasonLogo,.stats-season-logo{display:none !important;}
+@media (max-width:640px){.ov-stats{grid-auto-flow:row;grid-template-columns:repeat(2,1fr);} .rink{border-radius:30px;padding:20px 10px;} .slot{min-height:80px;}}
+
+/* ---- review round 3 ---- */
+.rink{padding:46px 26px 50px;background:
+    radial-gradient(circle at 50% 22px, rgba(1,183,240,.20) 0 54px, rgba(225,90,90,.5) 55px 57px, transparent 58px),
+    radial-gradient(circle at 50% calc(100% - 22px), rgba(1,183,240,.20) 0 54px, rgba(225,90,90,.5) 55px 57px, transparent 58px),
+    radial-gradient(circle at 50% 50%, transparent 68px, rgba(1,183,240,.38) 68px 70px, transparent 71px),
+    radial-gradient(circle at 22% 17%, transparent 56px, rgba(225,90,90,.5) 56px 58px, transparent 59px),
+    radial-gradient(circle at 78% 17%, transparent 56px, rgba(225,90,90,.5) 56px 58px, transparent 59px),
+    radial-gradient(circle at 22% 83%, transparent 56px, rgba(225,90,90,.5) 56px 58px, transparent 59px),
+    radial-gradient(circle at 78% 83%, transparent 56px, rgba(225,90,90,.5) 56px 58px, transparent 59px),
+    linear-gradient(to bottom, transparent 20px, rgba(225,90,90,.5) 20px, rgba(225,90,90,.5) calc(20px + 3px), transparent calc(20px + 3px)),
+    linear-gradient(to bottom, transparent calc(100% - 23px), rgba(225,90,90,.5) calc(100% - 23px), rgba(225,90,90,.5) calc(calc(100% - 23px) + 3px), transparent calc(calc(100% - 23px) + 3px)),
+    linear-gradient(to bottom, transparent 33%, rgba(1,183,240,.38) 33%, rgba(1,183,240,.38) calc(33% + 6px), transparent calc(33% + 6px)),
+    linear-gradient(to bottom, transparent calc(67% - 6px), rgba(1,183,240,.38) calc(67% - 6px), rgba(1,183,240,.38) calc(calc(67% - 6px) + 6px), transparent calc(calc(67% - 6px) + 6px)),
+    linear-gradient(to bottom, transparent calc(50% - 3px), rgba(225,90,90,.5) calc(50% - 3px), rgba(225,90,90,.5) calc(calc(50% - 3px) + 6px), transparent calc(calc(50% - 3px) + 6px)),
+    linear-gradient(180deg, #0F1922, #0C141B);}
+.rink-row.gk{margin:18px auto 40px;}
+.slot{grid-template-columns:64px auto;min-height:104px;}
+.slot .slot-photo{width:64px;height:64px;}
+.team-wl-col{width:280px;}
+.wl-header{justify-content:center;gap:8px;}
+.wl-header span{width:110px;text-align:center;}
+.wl-item{justify-content:center;}
+.wl-bar-half{width:110px;}
+.league-layout{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:18px;align-items:start;}
+.league-layout .league-groups-row{flex-direction:column;}
+.league-layout .calendar-section{margin:0;padding:0 0 0 18px;border:none;border-left:1px solid var(--line);}
+.league-layout .calendar-section>.league-group-title{font-size:18px;color:var(--text);text-transform:none;letter-spacing:.2px;margin-bottom:12px;}
+.league-layout .calendar-section>.league-group-title a{font-size:12.5px;}
+@media (max-width:900px){.league-layout{grid-template-columns:1fr;} .league-layout .calendar-section{border-left:none;padding:0;}}
+
+/* ---- review round 4 ---- */
+.team-bottom-row{gap:16px;}
+.team-bottom-row .team-totals-col{width:290px;padding:16px;}
+
+#leagueSwitchBox .panel-head{margin-bottom:8px;}
+#leagueSwitchBox table[data-g]{display:none;}
+#leagueSwitchBox.show-Z table[data-g="Z"],#leagueSwitchBox.show-D table[data-g="D"]{display:table;}
+#teamTotalsTable td.merged{text-align:center;}
+
+/* ---- review round 5: one defensive zone, one line at a time ---- */
+.lineup-head{margin-bottom:14px;}
+.lineup-head .grp-chips button{font-size:12.5px;padding:5px 12px;}
+.rink{max-width:820px;aspect-ratio:850/750;margin:0 auto;padding:7% 5% 0;border:none;border-radius:0;
+  background:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20850%20750%22%20preserveAspectRatio%3D%22none%22%3E%0A%3Crect%20x%3D%222%22%20y%3D%222%22%20width%3D%22846%22%20height%3D%22746%22%20rx%3D%220%22%20ry%3D%220%22%20fill%3D%22none%22/%3E%0A%3Cpath%20d%3D%22M3%200%20V470%20A278%20278%200%200%200%20281%20748%20H569%20A278%20278%200%200%200%20847%20470%20V0%22%20fill%3D%22%230E1821%22%20stroke%3D%22%233A4757%22%20stroke-width%3D%225%22/%3E%0A%3Crect%20x%3D%223%22%20y%3D%220%22%20width%3D%22844%22%20height%3D%2212%22%20fill%3D%22%231BA6D8%22%20opacity%3D%22.55%22/%3E%0A%3Cline%20x1%3D%2220%22%20y1%3D%22640%22%20x2%3D%22830%22%20y2%3D%22640%22%20stroke%3D%22%23C24A4A%22%20stroke-width%3D%223%22%20opacity%3D%22.75%22/%3E%0A%3Cpath%20d%3D%22M365%20640%20A60%2060%200%200%201%20485%20640%20Z%22%20fill%3D%22%231BA6D8%22%20fill-opacity%3D%22.22%22%20stroke%3D%22%23C24A4A%22%20stroke-width%3D%222.5%22%20opacity%3D%22.9%22/%3E%0A%3Crect%20x%3D%22395%22%20y%3D%22640%22%20width%3D%2260%22%20height%3D%2240%22%20rx%3D%228%22%20fill%3D%22none%22%20stroke%3D%22%238A99A3%22%20stroke-width%3D%222.5%22%20opacity%3D%22.6%22/%3E%0A%3Cg%20fill%3D%22none%22%20stroke%3D%22%23C24A4A%22%20stroke-width%3D%222.5%22%20opacity%3D%22.7%22%3E%0A%3Ccircle%20cx%3D%22205%22%20cy%3D%22440%22%20r%3D%22150%22/%3E%3Ccircle%20cx%3D%22645%22%20cy%3D%22440%22%20r%3D%22150%22/%3E%0A%3Cpath%20d%3D%22M175%20290%20v-12%20M235%20290%20v-12%20M175%20590%20v12%20M235%20590%20v12%20M615%20290%20v-12%20M675%20290%20v-12%20M615%20590%20v12%20M675%20590%20v12%22/%3E%0A%3Cpath%20d%3D%22M185%20425%20h-25%20v-10%20M225%20425%20h25%20v-10%20M185%20455%20h-25%20v10%20M225%20455%20h25%20v10%20M625%20425%20h-25%20v-10%20M665%20425%20h25%20v-10%20M625%20455%20h-25%20v10%20M665%20455%20h25%20v10%22/%3E%0A%3C/g%3E%0A%3Cg%20fill%3D%22%23C24A4A%22%20opacity%3D%22.85%22%3E%3Ccircle%20cx%3D%22205%22%20cy%3D%22440%22%20r%3D%2210%22/%3E%3Ccircle%20cx%3D%22645%22%20cy%3D%22440%22%20r%3D%2210%22/%3E%3C/g%3E%0A%3C/svg%3E") center/100% 100% no-repeat;display:flex;flex-direction:column;}
+.rink-row{display:none;}
+.rink-row.show{display:grid;}
+.rink-row.show+.rink-row.def.show{margin-top:6%;}
+.rink-row.gk.show{margin:auto auto 13.5%;max-width:250px;width:100%;}
+@media (max-width:640px){.rink{aspect-ratio:auto;padding:24px 8px 30px;background-size:100% 100%;} .rink-row.gk.show{margin:20px auto 20px;}}
+.ovt tr.cut td{border-bottom:2px solid var(--draw);}
+
+/* ---- review round 6: players placed in the zone, hover cards ---- */
+.rink{position:relative;max-width:680px;padding:0;display:block;}
+.rink-row.show{position:absolute;inset:0;display:block;margin:0 !important;max-width:none !important;pointer-events:none;}
+.rink-row.show .slot{position:absolute;width:31%;transform:translate(-50%,-50%);pointer-events:auto;min-height:112px;
+  grid-template-columns:72px minmax(0,1fr);justify-content:start;cursor:default;}
+.rink-row.show .slot .slot-photo{width:72px;height:72px;}
+.rink-row.show .slot .slot-name{font-size:14px;}
+.rink-row.show .slot .slot-stat{font-size:11.5px;}
+.rink-row.show .slot:hover{border-color:var(--ice);}
+.rink-row:not(.def):not(.gk).show .slot{top:16%;}
+.rink-row:not(.def):not(.gk).show .slot:nth-child(1){left:18%;}
+.rink-row:not(.def):not(.gk).show .slot:nth-child(2){left:50%;}
+.rink-row:not(.def):not(.gk).show .slot:nth-child(3){left:82%;}
+.rink-row.def.show .slot{top:58.7%;}
+.rink-row.def.show .slot:nth-child(1){left:24.1%;}
+.rink-row.def.show .slot:nth-child(2){left:75.9%;}
+.rink-row.gk.show .slot{top:82%;left:50%;}
+.slot-pop{position:absolute;z-index:40;display:none;background:var(--panel);border:1px solid var(--ice);border-radius:12px;padding:12px 14px;
+  box-shadow:0 12px 34px rgba(0,0,0,.55);width:min(420px,96%);pointer-events:none;}
+.slot-pop-name{font-family:'Oswald',sans-serif;font-weight:600;font-size:16px;margin-bottom:8px;}
+.slot-pop .card-stat-num{font-size:18px;}
+#skaterBoxTable tr.line-total td{font-weight:700;border-top:2px solid var(--line);background:var(--panel2);}
+@media (max-width:700px){
+  .rink{aspect-ratio:auto;padding:22px 8px 26px;}
+  .rink-row.show{position:static;display:grid;pointer-events:auto;margin:0 auto 10px !important;}
+  .rink-row.show .slot{position:static;transform:none;width:auto;}
+}
+
+/* ---- final zone (approved zone mockup) ---- */
+.rink{max-width:1000px;aspect-ratio:1000/520;background:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%201000%20520%22%3E%0A%3Cdefs%3E%3CclipPath%20id%3D%22ice%22%3E%3Cpath%20d%3D%22M0%200%20V320%20A200%20200%200%200%200%20200%20520%20H800%20A200%20200%200%200%200%201000%20320%20V0%20Z%22/%3E%3C/clipPath%3E%3C/defs%3E%0A%3Cpath%20d%3D%22M0%200%20V320%20A200%20200%200%200%200%20200%20520%20H800%20A200%20200%200%200%200%201000%20320%20V0%20Z%22%20fill%3D%22%230E1821%22/%3E%0A%3Cg%20clip-path%3D%22url%28%23ice%29%22%3E%0A%3Crect%20x%3D%220%22%20y%3D%2222%22%20width%3D%221000%22%20height%3D%2214%22%20fill%3D%22%231BA6D8%22%20opacity%3D%22.6%22/%3E%0A%3Cline%20x1%3D%220%22%20y1%3D%22430%22%20x2%3D%221000%22%20y2%3D%22430%22%20stroke%3D%22%23C24A4A%22%20stroke-width%3D%223%22%20opacity%3D%22.8%22/%3E%0A%3Cpath%20d%3D%22M440%20430%20A60%2060%200%200%201%20560%20430%20Z%22%20fill%3D%22%231BA6D8%22%20fill-opacity%3D%22.22%22%20stroke%3D%22%23C24A4A%22%20stroke-width%3D%222.5%22/%3E%0A%3Crect%20x%3D%22470%22%20y%3D%22430%22%20width%3D%2260%22%20height%3D%2234%22%20rx%3D%228%22%20fill%3D%22none%22%20stroke%3D%22%238A99A3%22%20stroke-width%3D%222.5%22%20opacity%3D%22.6%22/%3E%0A%3Cg%20fill%3D%22none%22%20stroke%3D%22%23C24A4A%22%20stroke-width%3D%222.5%22%20opacity%3D%22.7%22%3E%0A%3Ccircle%20cx%3D%22240%22%20cy%3D%22262%22%20r%3D%22112%22/%3E%3Ccircle%20cx%3D%22760%22%20cy%3D%22262%22%20r%3D%22112%22/%3E%0A%3Cpath%20d%3D%22M216%20150%20v-12%20M264%20150%20v-12%20M216%20374%20v12%20M264%20374%20v12%20M736%20150%20v-12%20M784%20150%20v-12%20M736%20374%20v12%20M784%20374%20v12%22/%3E%0A%3Cpath%20d%3D%22M222%20248%20h-24%20v-10%20M258%20248%20h24%20v-10%20M222%20276%20h-24%20v10%20M258%20276%20h24%20v10%20M742%20248%20h-24%20v-10%20M778%20248%20h24%20v-10%20M742%20276%20h-24%20v10%20M778%20276%20h24%20v10%22/%3E%0A%3C/g%3E%0A%3Cg%20fill%3D%22%23C24A4A%22%20opacity%3D%22.85%22%3E%3Ccircle%20cx%3D%22240%22%20cy%3D%22262%22%20r%3D%2210%22/%3E%3Ccircle%20cx%3D%22760%22%20cy%3D%22262%22%20r%3D%2210%22/%3E%3C/g%3E%0A%3C/g%3E%0A%3Cpath%20d%3D%22M3%200%20V320%20A197%20197%200%200%200%20200%20517%20H800%20A197%20197%200%200%200%20997%20320%20V0%22%20fill%3D%22none%22%20stroke%3D%22%233A4757%22%20stroke-width%3D%226%22/%3E%0A%3C/svg%3E") center/100% 100% no-repeat;}
+.rink-row.show .slot{width:31.5%;min-height:128px;grid-template-columns:88px minmax(0,1fr);column-gap:12px;padding:14px 16px;border-radius:10px;}
+.rink-row.show .slot .slot-photo{width:88px;height:88px;}
+.rink-row.show .slot .slot-label{font-size:11.5px;}
+.rink-row.show .slot .slot-name{font-size:16.5px;line-height:1.25;}
+.rink-row.show .slot .slot-name .nw{white-space:nowrap;}
+.rink-row.show .slot .slot-stat{font-size:13px;margin-top:5px;}
+.rink-row:not(.def):not(.gk).show .slot{top:22.5%;}
+.rink-row:not(.def):not(.gk).show .slot:nth-child(1){left:16.5%;}
+.rink-row:not(.def):not(.gk).show .slot:nth-child(3){left:83.5%;}
+.rink-row.def.show .slot{top:50.4%;}
+.rink-row.gk.show .slot{top:79%;}
+#lineChips{gap:8px;}
+#lineChips button{padding:9px 26px;min-width:120px;font-size:15px;}
+.slot-pop{width:380px;padding:0;overflow:hidden;}
+.pc-head{display:flex;align-items:center;gap:12px;padding:12px 14px;background:linear-gradient(135deg,rgba(131,12,103,.55),rgba(131,12,103,.12));border-bottom:1px solid var(--line);}
+.pc-head img{width:52px;height:52px;border-radius:50%;object-fit:cover;object-position:top;background:#fff;}
+.pc-name{font-family:'Oswald',sans-serif;font-weight:600;font-size:18px;line-height:1.1;}
+.pc-meta{font-size:11.5px;color:#d8c7d4;margin-top:3px;}
+.pc-body{padding:12px 14px 14px;}
+.pc-trio{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;}
+.pc-trio div{background:var(--panel2);border:1px solid var(--line);border-radius:8px;text-align:center;padding:8px 0;}
+.pc-trio div.hl{background:rgba(131,12,103,.25);border-color:var(--ice);}
+.pc-trio b{display:block;font-family:'Oswald',sans-serif;font-size:26px;font-weight:600;line-height:1.05;}
+.pc-trio span{font-size:10.5px;color:var(--text-dim);}
+.pc-bar{margin:10px 0;}
+.pc-bar .t{display:flex;justify-content:space-between;font-size:12px;color:var(--text-dim);margin-bottom:5px;}
+.pc-bar .t b{color:var(--text);font-weight:600;}
+.pc-bar .track{height:8px;border-radius:999px;background:#2A3340;overflow:hidden;display:flex;}
+.pc-bar .fill{height:100%;background:var(--cyan);} .pc-bar .fill.mg{background:#D04BAE;}
+.pc-all{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line);}
+.pc-all div{background:var(--panel2);border-radius:6px;text-align:center;padding:6px 2px;}
+.pc-all b{display:block;font-family:'Oswald',sans-serif;font-size:16px;font-weight:600;}
+.pc-all span{font-size:9.5px;color:var(--text-dim);}
+.pc-all .pos b{color:#4CC98E;} .pc-all .neg b{color:#E15A5A;}
+.pc-ring{display:flex;align-items:center;gap:16px;}
+.pc-ring .c{width:86px;height:86px;border-radius:50%;display:grid;place-items:center;flex-shrink:0;}
+.pc-ring .c div{width:66px;height:66px;border-radius:50%;background:var(--panel);display:grid;place-items:center;font-family:'Oswald',sans-serif;font-size:19px;font-weight:600;}
+.pc-ring .k{font-size:13px;color:var(--text-dim);line-height:1.9;} .pc-ring .k b{color:var(--text);}
+@media (max-width:700px){.rink{aspect-ratio:auto;} .rink-row.show .slot{width:auto;} #lineChips button{min-width:0;padding:8px 14px;font-size:13.5px;}}
+
+/* ---- team stats: bigger E5 table and next game ---- */
+#leagueUpdatedLabel{display:none;}
+#leagueSwitchBox .panel-head .league-group-title{display:none;}
+#leagueSwitchBox .panel-head{justify-content:flex-end;}
+#leagueSwitchBox .grp-chips button{font-size:13.5px;padding:6px 16px;}
+#leagueSwitchBox{padding:16px 18px;}
+#leagueSwitchBox .league-table{font-size:15.5px;}
+#leagueSwitchBox .league-table th{font-size:12.5px;padding:8px 10px;}
+#leagueSwitchBox .league-table td{padding:11px 10px;}
+#leagueSwitchBox .league-logo{width:24px;height:24px;margin-right:10px;}
+.league-layout .calendar-section>.league-group-title{font-size:22px;}
+.league-layout .calendar-section>.league-group-title a{font-size:14px;}
+.league-layout .calendar-row{display:flex;flex-direction:column;align-items:flex-start;gap:8px;}
+.league-layout .calendar-opp{font-size:20px;font-weight:700;display:flex;align-items:center;gap:8px;}
+.league-layout .calendar-opp .vs{font-size:15px;color:var(--text-dim);font-weight:500;}
+.league-layout .calendar-opp .league-logo{width:34px;height:34px;margin:0;}
+.league-layout .calendar-when{font-size:15px;color:var(--text-dim);}
+
+#leagueSwitchBox .league-table{font-size:20px;}
+#leagueSwitchBox .league-table th{font-size:13.5px;padding:6px 10px;}
+#leagueSwitchBox .league-table td{padding:7px 10px;line-height:1.25;}
+#leagueSwitchBox .league-logo{width:30px;height:30px;}
+.team-bottom-row .team-league-col{display:flex;flex-direction:column;}
+.team-bottom-row .league-layout{flex:1;align-items:stretch;}
+.team-bottom-row .league-groups-row,.team-bottom-row #leagueSwitchBox{height:100%;}
+
+/* ---- season totals: grouped ---- */
+#teamTotalsTable{width:100%;max-width:none;font-size:13.5px;}
+#teamTotalsTable thead th{font-size:11px;text-transform:uppercase;letter-spacing:.3px;}
+#teamTotalsTable td{padding:6px 8px;}
+#teamTotalsTable td:nth-child(2),#teamTotalsTable td:nth-child(3){font-variant-numeric:tabular-nums;}
+#teamTotalsTable td:nth-child(2){font-weight:600;}
+#teamTotalsTable td:nth-child(3){color:var(--text-dim);}
+#teamTotalsTable tr.tt-group td{font-family:'Oswald',sans-serif;font-weight:600;font-size:11.5px;letter-spacing:.6px;text-transform:uppercase;
+  color:#D04BAE;padding:12px 8px 4px;border-bottom:1px solid var(--line);text-align:left;}
+#teamTotalsTable .tt-pv{display:flex;align-items:center;gap:10px;}
+#teamTotalsTable .tt-bar{flex:1;height:6px;border-radius:999px;background:#2A3340;overflow:hidden;}
+#teamTotalsTable .tt-bar span{display:block;height:100%;background:var(--cyan);border-radius:999px;}
+#teamTotalsTable tr.tt-pct b{min-width:52px;text-align:right;font-weight:600;}
+/* league switch: full-width segmented control */
+#leagueSwitchBox .panel-head{display:block;margin-bottom:10px;}
+#leagueSwitchBox .grp-chips{display:grid;grid-template-columns:1fr 1fr;gap:0;width:100%;margin:0;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:4px;}
+#leagueSwitchBox .grp-chips button{border:none;border-radius:7px;padding:10px 0;font-size:15px;background:transparent;}
+#leagueSwitchBox .grp-chips button.on{background:var(--ice);color:#fff;}
+
+/* ---- team stats: livelier record + periods, league table fills the box ---- */
+#teamGameLogTable tbody td:nth-child(2){max-width:220px;}
+#teamRecordStrip.rec2-wrap{display:block;background:none;border:none;margin:14px 0 0;overflow:visible;}
+.rec2{display:flex;align-items:center;gap:26px;}
+.rec-ring{width:132px;height:132px;border-radius:50%;display:grid;place-items:center;flex-shrink:0;}
+.rec-ring>div{width:102px;height:102px;border-radius:50%;background:var(--panel);display:flex;flex-direction:column;align-items:center;justify-content:center;}
+.rec-ring b{font-family:'Oswald',sans-serif;font-size:26px;font-weight:600;line-height:1;}
+.rec-ring span{font-size:11px;color:var(--text-dim);margin-top:4px;text-transform:uppercase;letter-spacing:.4px;}
+.rec-side{flex:1;min-width:0;}
+.rec-top{display:flex;align-items:center;gap:18px;margin-bottom:18px;}
+.rec-gp b{font-family:'Oswald',sans-serif;font-size:34px;font-weight:600;line-height:1;margin-right:6px;}
+.rec-gp span{color:var(--text-dim);font-size:13px;}
+.rec-pills{display:flex;gap:8px;}
+.pill{border-radius:999px;padding:5px 14px;font-size:14px;font-weight:600;}
+.pill b{font-family:'Oswald',sans-serif;font-size:18px;margin-right:2px;}
+.pill.w{background:rgba(76,201,142,.15);color:var(--win);} .pill.l{background:rgba(225,90,90,.15);color:var(--loss);} .pill.d{background:rgba(232,178,79,.15);color:var(--draw);}
+.rec-goals .t{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;color:var(--text-dim);margin-bottom:7px;}
+.rec-goals .t b{font-family:'Oswald',sans-serif;font-size:24px;font-weight:600;margin:0 4px;}
+.rec-goals .t b.g{color:var(--win);} .rec-goals .t b.a{color:var(--loss);}
+.df{font-family:'Oswald',sans-serif;font-weight:600;font-size:15px;padding:2px 10px;border-radius:999px;background:var(--panel2);color:var(--text-dim);}
+.df.pos{color:var(--win);background:rgba(76,201,142,.12);} .df.neg{color:var(--loss);background:rgba(225,90,90,.12);}
+.duel{display:flex;height:10px;border-radius:999px;overflow:hidden;gap:3px;}
+.duel .g{background:var(--win);border-radius:999px;} .duel .a{background:var(--loss);border-radius:999px;opacity:.85;}
+.duel.sh .g{background:var(--cyan);} .duel.sh .a{background:#3A4757;opacity:1;}
+#teamPeriodTable thead{display:none;}
+#teamPeriodTable tr.pr td{border-bottom:1px solid var(--line);padding:12px 6px;}
+#teamPeriodTable tr.pr:last-child td{border-bottom:none;}
+#teamPeriodTable td.pn{font-family:'Oswald',sans-serif;font-size:22px;font-weight:600;width:44px;text-align:left;color:var(--text-dim);}
+.pr-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px;}
+.pd .t{display:flex;align-items:baseline;gap:8px;margin-bottom:6px;font-size:12px;color:var(--text-dim);}
+.pd .t b{font-family:'Oswald',sans-serif;font-size:19px;font-weight:600;color:var(--text);}
+.pd .t span:first-of-type{flex:1;text-align:center;}
+.pd .t b.ag{color:var(--text-dim);}
+.pd .df{font-size:12.5px;padding:1px 8px;}
+@media (max-width:640px){.rec2{flex-direction:column;align-items:stretch;} .rec-ring{margin:0 auto;} .pr-grid{grid-template-columns:1fr;gap:12px;}}
+#leagueSwitchBox{display:flex;flex-direction:column;}
+#leagueSwitchBox.show-Z table[data-g="Z"],#leagueSwitchBox.show-D table[data-g="D"]{flex:1;height:100%;}
+
+.duel{gap:0;border-radius:999px;}
+.duel .g,.duel .a{border-radius:0;}
+#leagueSwitchBox .league-table{font-size:26px;}
+#leagueSwitchBox .league-table th{font-size:14px;}
+#leagueSwitchBox .league-logo{width:38px;height:38px;margin-right:12px;}
+.league-layout .calendar-opp{font-size:26px;}
+.league-layout .calendar-opp .vs{font-size:18px;}
+.league-layout .calendar-opp .league-logo{width:42px;height:42px;}
+.league-layout .calendar-when{font-size:19px;}
+
+#leagueSwitchBox .league-table{font-size:19px;}
+#leagueSwitchBox .league-table td:not(:first-child),#leagueSwitchBox .league-table th:not(:first-child){text-align:center;padding-left:6px;padding-right:6px;}
+#leagueSwitchBox .league-table td:nth-child(5),#leagueSwitchBox .league-table td:nth-child(6){color:var(--text-dim);}
+#leagueSwitchBox .league-table td.pts{font-weight:700;}
+#leagueSwitchBox .league-logo{width:30px;height:30px;}
+
+.league-layout{grid-template-columns:minmax(0,2.3fr) minmax(0,1fr);}
+#leagueSwitchBox .league-table{font-size:21px;}
+
+#leagueSwitchBox .league-logo{width:46px;height:46px;margin-right:14px;}
+
+.pr-grid{grid-template-columns:repeat(3,1fr);gap:20px;}
+.pd .lbl{text-align:center;font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;}
+.pd .t{position:relative;justify-content:center;align-items:baseline;gap:6px;}
+.pd .t span.sep{flex:0 0 auto;color:var(--text-faint);}
+.pd .t b.ag{color:var(--text);}
+.pd .t .df{position:absolute;right:0;top:50%;transform:translateY(-50%);width:40px;text-align:center;padding:2px 0;}
+.duel.fo .g{background:#D04BAE;} .duel.fo .a{background:#3A4757;opacity:1;}
+@media (max-width:900px){.pr-grid{grid-template-columns:1fr;gap:12px;}}
+
+/* ---- calendar: bigger, logos, division colours ---- */
+.cal-layout{grid-template-columns:minmax(0,1fr) 300px;}
+.cal-day{min-height:138px;padding:7px;gap:5px;}
+.cal-num{font-size:14px;}
+.cal-items{gap:5px;}
+.t-E5{--c:#D04BAE;} .t-E7{--c:var(--cyan);} .t-E9{--c:var(--draw);} .t-practice{--c:#8A99A3;} .t-bday,.t-nday{--c:#586570;}
+.ce{display:flex;flex-direction:column;align-items:center;gap:3px;border-radius:6px;padding:5px 4px;min-width:0;}
+.ce-g{background:color-mix(in srgb, var(--dc) 16%, transparent);border:1px solid color-mix(in srgb, var(--dc) 55%, transparent);}
+.ce-g.d-E5{--dc:#D04BAE;} .ce-g.d-E7{--dc:#01B7F0;} .ce-g.d-E9{--dc:#E8B24F;}
+.ce-p{background:rgba(138,153,163,.10);border:1px solid rgba(138,153,163,.35);}
+.ce-top{display:flex;align-items:center;gap:6px;}
+.ce-top .ha{font-size:12px;color:var(--text-dim);font-weight:600;}
+.ce-logo{width:30px;height:30px;object-fit:contain;}
+.ce-ini{width:30px;height:30px;border-radius:50%;background:var(--panel);border:1px solid var(--line);display:grid;place-items:center;font:600 10px 'Oswald',sans-serif;color:var(--text-dim);}
+.ce-ic{width:26px;height:26px;color:#C9D3DA;}
+.ce-sub{font-size:11px;color:var(--text-dim);text-align:center;line-height:1.25;white-space:normal;}
+.ce.solo{flex:1;justify-content:center;gap:8px;}
+.ce.solo .ce-logo,.ce.solo .ce-ini{width:52px;height:52px;}
+.ce.solo .ce-ic{width:44px;height:44px;}
+.ce.solo .ce-top .ha{font-size:15px;}
+.ce.solo .ce-sub{font-size:12.5px;}
+.ce-t{display:block;font-size:11.5px;color:var(--text);text-align:left;padding:2px 2px;background:none;border:none;white-space:normal;line-height:1.3;}
+.ce-t span{color:var(--text-dim);}
+.cal-day .cal-items{flex:1;display:flex;flex-direction:column;}
+.cal-chip.t-E5,.cal-chip.t-E7,.cal-chip.t-E9{font-weight:700;}
+@media (max-width:640px){.cal-day{min-height:50px;}}
+
+.ce-ic{width:34px;height:31px;} .ce.solo .ce-ic{width:62px;height:57px;}
+
+.ce-t{display:flex !important;flex-direction:row !important;align-items:center;gap:7px;text-align:left;padding:5px 7px !important;
+  background:rgba(255,255,255,.035) !important;border:1px solid var(--line) !important;border-radius:6px;}
+.ce-pi{width:18px;height:18px;flex-shrink:0;color:#AAB6BE;}
+.ce-pn{display:flex;flex-direction:column;min-width:0;line-height:1.2;}
+.ce-pn b{font-size:12px;font-weight:600;color:var(--text);white-space:normal;}
+.ce-pn small{font-size:10px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.4px;margin-top:2px;}
+.ce-t.solo{flex:1;flex-direction:column !important;justify-content:center;text-align:center;gap:8px;}
+.ce-t.solo .ce-pi{width:34px;height:34px;}
+.ce-t.solo .ce-pn{align-items:center;}
+.ce-t.solo .ce-pn b{font-size:14px;}
 </style>
 </head>
 <body>
@@ -555,6 +899,7 @@ footer{text-align:center;color:var(--text-faint);font-size:12px;padding:20px;}
   </div>
 
   <div class="wrap">
+    <div class="bx-pair bx-top">
     <div class="scoreboard">
       <img id="sbSeasonLogo" class="sb-season-logo" src="" alt="">
       <div class="sb-meta" id="sbMeta"></div>
@@ -577,6 +922,13 @@ footer{text-align:center;color:var(--text-faint);font-size:12px;padding:20px;}
       <div class="otg-line" id="sbOtg"></div>
     </div>
 
+    <div class="panel bx-stats">
+      <h2>Match statistics</h2>
+      <div id="compareBars"></div>
+    </div>
+    </div>
+
+    <div class="bx-pair">
     <div class="panel">
       <h2>Goals</h2>
       <div class="goal-cols">
@@ -592,11 +944,6 @@ footer{text-align:center;color:var(--text-faint);font-size:12px;padding:20px;}
     </div>
 
     <div class="panel">
-      <h2>Match statistics</h2>
-      <div id="compareBars"></div>
-    </div>
-
-    <div class="panel">
       <h2>Shots &amp; faceoffs by period</h2>
       <div class="table-scroll">
         <table id="periodTable">
@@ -605,14 +952,15 @@ footer{text-align:center;color:var(--text-faint);font-size:12px;padding:20px;}
         </table>
       </div>
     </div>
-
-    <div class="panel">
-      <h2>Starting lineup</h2>
-      <div class="rink" id="lineupRink"></div>
     </div>
 
     <div class="panel">
-      <h2>Ledus Veči player stats this game</h2>
+      <div class="panel-head lineup-head"><h2 style="margin:0">Starting lineup</h2><div class="grp-chips" id="lineChips"></div></div>
+      <div class="rink" id="lineupRink"></div>
+    </div>
+
+    <div class="panel" style="display:none"><!-- game player table: replaced by the hover cards on the rink; kept hidden because the page code still fills it -->
+      <h2><span>Ledus Veči player stats this game</span><span id="lineTitle" style="color:var(--text-dim);font-weight:500"></span></h2>
       <div class="table-scroll">
         <table id="skaterBoxTable">
           <thead><tr>
@@ -676,6 +1024,7 @@ footer{text-align:center;color:var(--text-faint);font-size:12px;padding:20px;}
   </div>
 
   <div class="team-stats-static">
+    <div class="bx-pair ts-pair">
     <div class="panel">
       <h2>Record</h2>
       <div class="record-strip" id="teamRecordStrip"></div>
@@ -692,6 +1041,7 @@ footer{text-align:center;color:var(--text-faint);font-size:12px;padding:20px;}
         </table>
       </div>
     </div>
+    </div>
 
     <div class="panel">
       <h2>Game log</h2>
@@ -705,7 +1055,7 @@ footer{text-align:center;color:var(--text-faint);font-size:12px;padding:20px;}
           <div class="table-scroll" style="max-height:480px;overflow-y:auto;">
             <table id="teamGameLogTable">
               <thead><tr>
-                <th style="text-align:left">Date</th><th style="text-align:left">Opponent</th>
+                <th style="text-align:left">Datums</th><th style="text-align:left">Pretinieks</th>
                 <th>G</th><th>GA</th><th>Shot%</th><th>Save%</th><th>PP</th><th>PP%</th><th>PK</th><th>PK%</th>
               </tr></thead>
               <tbody></tbody>
@@ -715,12 +1065,12 @@ footer{text-align:center;color:var(--text-faint);font-size:12px;padding:20px;}
       </div>
     </div>
 
-    <div class="team-stats-row">
+    <div class="team-stats-row team-bottom-row">
       <div class="panel team-totals-col">
         <h2>Season totals &amp; averages</h2>
         <table id="teamTotalsTable">
           <thead><tr>
-            <th style="text-align:left">Stat</th><th>Total</th><th>Average / game</th>
+            <th style="text-align:left"></th><th>Kopā</th><th>Vidēji spēlē</th>
           </tr></thead>
           <tbody></tbody>
         </table>
@@ -728,18 +1078,17 @@ footer{text-align:center;color:var(--text-faint);font-size:12px;padding:20px;}
 
       <div class="panel team-league-col">
         <h2>E5 League Table <span class="league-updated" id="leagueUpdatedLabel"></span></h2>
+        <div class="league-layout">
         <div class="league-groups-row">
-          <div class="league-group-box">
-            <div class="league-group-title">Ziemeļi</div>
-            <table class="league-table">
-              <thead><tr><th style="text-align:left">Team</th><th>GP</th><th>PTS</th></tr></thead>
+          <div class="league-group-box" id="leagueSwitchBox">
+            <div class="panel-head"><span class="league-group-title" style="margin:0">Grupa</span>
+              <div class="grp-chips"><button type="button" data-g="Z">Ziemeļi</button><button type="button" data-g="D">Dienvidi</button></div></div>
+            <table class="league-table" data-g="Z">
+              <thead><tr><th style="text-align:left">Team</th><th>GP</th><th>GF</th><th>GA</th><th>PP%</th><th>PK%</th><th>PTS</th></tr></thead>
               <tbody id="leagueZiemeli"></tbody>
             </table>
-          </div>
-          <div class="league-group-box">
-            <div class="league-group-title">Dienvidi</div>
-            <table class="league-table">
-              <thead><tr><th style="text-align:left">Team</th><th>GP</th><th>PTS</th></tr></thead>
+            <table class="league-table" data-g="D">
+              <thead><tr><th style="text-align:left">Team</th><th>GP</th><th>GF</th><th>GA</th><th>PP%</th><th>PK%</th><th>PTS</th></tr></thead>
               <tbody id="leagueDienvidi"></tbody>
             </table>
           </div>
@@ -747,6 +1096,7 @@ footer{text-align:center;color:var(--text-faint);font-size:12px;padding:20px;}
         <div class="calendar-section">
           <div class="league-group-title">Next game <a href="#" id="openCalendarLink" style="float:right;text-transform:none;letter-spacing:0;font-family:Inter,sans-serif;font-weight:500;">Full calendar</a></div>
           <div id="calendarBody"></div>
+        </div>
         </div>
       </div>
     </div>
@@ -780,108 +1130,108 @@ footer{text-align:center;color:var(--text-faint);font-size:12px;padding:20px;}
 <div id="methodologyView" class="wrap hidden" style="padding-top:20px;">
 
   <div class="panel method-section">
-    <h2 style="margin-top:0;">Skater radar</h2>
-    <p class="method-body" style="margin-top:-6px;">Every component below is compared against a pooled set of games (all regular-season games, or all playoff games, of whatever season is selected) rather than just the games in view — this keeps the comparison stable instead of being skewed by a single freak game early in a small sample.</p>
+    <h2 style="margin-top:0;">Laukuma spēlētāju radars</h2>
+    <p class="method-body" style="margin-top:-6px;">Katrs zemāk aprakstītais rādītājs tiek salīdzināts ar visu izvēlētās sezonas spēļu kopu (visas regulārās sezonas spēles vai visas izslēgšanas spēles), nevis tikai ar tām spēlēm, kas redzamas ekrānā. Tā salīdzinājums paliek stabils un to neizkropļo viena neparasta spēle sezonas sākumā, kad spēļu vēl ir maz.</p>
 
     <hr class="method-divider">
 
-    <div class="method-axis-title">⚔ Offence</div>
+    <div class="method-axis-title">⚔ Uzbrukums</div>
     <div class="method-weight-row">
-      <span class="method-weight-chip"><b>Goals</b> 48%</span>
-      <span class="method-weight-chip"><b>Assists</b> 32%</span>
-      <span class="method-weight-chip"><b>Shots</b> 20%</span>
-      <span class="method-weight-chip">+ Penalties Drawn bonus (capped)</span>
+      <span class="method-weight-chip"><b>Vārti</b> 48%</span>
+      <span class="method-weight-chip"><b>Rezultatīvās piespēles</b> 32%</span>
+      <span class="method-weight-chip"><b>Metieni</b> 20%</span>
+      <span class="method-weight-chip">+ bonuss par izpelnītajiem noraidījumiem (ierobežots)</span>
     </div>
     <div class="method-body">
-      <p>Goals, assists and shots on goal are each normalized 0–10 on their own, then blended by the weights above. Before normalizing, every game's raw numbers get two multipliers applied:</p>
+      <p>Vārti, piespēles un metieni vārtos katrs tiek pārrēķināti skalā no 0 līdz 10 un tad apvienoti ar augstāk norādītajiem svariem. Pirms tam katras spēles rādītājiem piemēro divus koeficientus:</p>
       <ul>
-        <li><b>Position multiplier</b> — Goals/Assists: Forwards ×0.784, Defense ×1.387 (derived from real top-scorer output by position). Shots: Forwards ×0.86, Defense ×1.34 (derived from this roster's own shot-volume rates). Position is read from what a player actually lined up as <i>that specific game</i> (the line-slot letters), not their usual roster position — so a defenseman filling in at forward for a night gets the forward multiplier that game.</li>
-        <li><b>Line multiplier</b> — Line 1 and 2 both ×1.0 (roughly equal ice time in practice, so no adjustment between them); Line 3 ×2.1, since 3rd-liners produce a lot less, grounded in this team's own scoring gap (dampened from the raw 2.92x gap observed).</li>
+        <li><b>Pozīcijas koeficients</b>: vārtiem un piespēlēm uzbrucējiem ×0,784, aizsargiem ×1,387 (balstīts uz reālu rezultatīvāko spēlētāju sniegumu pa pozīcijām). Metieniem uzbrucējiem ×0,86, aizsargiem ×1,34 (balstīts uz šīs komandas metienu apjomu). Pozīciju nosaka pēc tā, kur spēlētājs <i>konkrētajā spēlē</i> tiešām spēlēja (maiņas apzīmējums), nevis pēc ierastās pozīcijas sastāvā. Ja aizsargs kādu spēli nospēlē uzbrukumā, tajā spēlē viņam piemēro uzbrucēja koeficientu.</li>
+        <li><b>Maiņas koeficients</b>: 1. un 2. maiņai ×1,0 (praksē laukumā pavadītais laiks ir līdzīgs, tāpēc starp tām korekcijas nav); 3. maiņai ×2,1, jo trešā maiņa gūst daudz mazāk punktu. Tas balstīts uz šīs komandas rezultativitātes starpību (mīkstināts no reāli novērotās 2,92 reizes lielās starpības).</li>
       </ul>
-      <p>Assists are combined into one weighted value before normalizing — not kept as separate primary/secondary components — so a player heavy on secondary assists isn't unfairly penalized: <b>primary assist = 1.0, secondary = 0.538</b> (same ratio, just anchored differently).</p>
-      <div class="method-formula">Offence = 0.48 × Goals(0-10) + 0.32 × Assists(0-10) + 0.20 × Shots(0-10)
-                + Penalties-Drawn bonus (0 to +1, capped so total never exceeds 10)</div>
+      <p>Piespēles pirms pārrēķina apvieno vienā svērtā vērtībā, nevis skaita pirmās un otrās piespēles atsevišķi, lai spēlētājs ar daudz otrajām piespēlēm netiktu netaisnīgi sodīts: <b>pirmā piespēle = 1,0, otrā = 0,538</b>.</p>
+      <div class="method-formula">Uzbrukums = 0,48 × Vārti(0-10) + 0,32 × Piespēles(0-10) + 0,20 × Metieni(0-10)
+                + bonuss par izpelnītajiem noraidījumiem (0 līdz +1, kopsumma nekad nepārsniedz 10)</div>
     </div>
 
     <hr class="method-divider">
 
-    <div class="method-axis-title">🎯 Shooting</div>
+    <div class="method-axis-title">🎯 Metieni</div>
     <div class="method-weight-row">
-      <span class="method-weight-chip">Forwards: <b>Shot% 70%</b> / SOG% 30%</span>
-      <span class="method-weight-chip">Defense: <b>Shot% 40%</b> / SOG% 60%</span>
+      <span class="method-weight-chip">Uzbrucēji: <b>Shot% 70%</b> / SOG% 30%</span>
+      <span class="method-weight-chip">Aizsargi: <b>Shot% 40%</b> / SOG% 60%</span>
     </div>
     <div class="method-body">
-      <p>Finishing (Shot%) matters more for forwards; getting the puck through traffic (SOG%) matters more for defensemen, hence the different split by position.</p>
+      <p>Uzbrucējiem svarīgāka ir realizācija (Shot%), aizsargiem – spēja aizmest ripu līdz vārtiem cauri spēlētājiem (SOG%), tāpēc svari pa pozīcijām atšķiras.</p>
       <ul>
-        <li><b>Shot%</b> uses a fixed real-world range — <b>2% (bad) to 18% (elite)</b> — not roster comparison, based on real NHL shooting benchmarks (league average sits near the midpoint, ~9.5%).</li>
-        <li><b>SOG%</b> (shots on goal ÷ shot attempts) is compared against the pool, since there's no equivalent external benchmark for it.</li>
-      </ul>
-    </div>
-
-    <hr class="method-divider">
-
-    <div class="method-axis-title">🛡 Defence</div>
-    <div class="method-weight-row">
-      <span class="method-weight-chip"><b>GA-against</b> 40%</span>
-      <span class="method-weight-chip"><b>Blocks</b> 40%</span>
-      <span class="method-weight-chip"><b>Team Shot Diff</b> 20%</span>
-    </div>
-    <div class="method-body">
-      <p>All three use <b>fixed ranges</b>, not roster comparison — each grounded in either real data or this team's own observed spread:</p>
-      <ul>
-        <li><b>GA-against</b> (inverted — lower is better): goals allowed while on ice. Penalty-kill and empty-net goals against are excluded entirely where we have confirmed which specific goals those were (from real game-by-game tagging); a shorthanded goal scored against the team counts <i>more</i> (1.25x), since that's a bigger individual lapse. A line multiplier also applies (Line 3 allows more, reflecting more ice time and tougher matchups for the top lines) — regular season: 0.88 / 0.98 / 1.19; playoffs: 0.78 / 1.00 / 1.50 (benches shorten in playoff hockey). Fixed range: <b>0.55 (good) to 1.2 (bad)</b>, cross-checked against real NHL GA/60 benchmarks scaled down to an amateur ~15-minute game.</li>
-        <li><b>Blocks</b> get a position multiplier (Forwards ×1.44, Defense ×0.68, since blocks are rarer for forwards) and a fixed range of <b>0 to 1.5</b> blocks/game.</li>
-        <li><b>Team Shot Differential</b> — the team's shots-for minus shots-against in games this specific player appeared in, averaged per game. This is a coarser "team performance when this player plays" signal, not true individual on-ice tracking (the sheet doesn't record that), which is why it carries a smaller 20% share. Fixed range: <b>-8 to +12</b>.</li>
+        <li><b>Shot%</b> izmanto fiksētu, reālu diapazonu – <b>no 2% (vāji) līdz 18% (izcili)</b> –, nevis salīdzinājumu ar komandas biedriem. Tas balstīts uz NHL realizācijas rādītājiem (līgas vidējais ir ap 9,5%, aptuveni diapazona vidū).</li>
+        <li><b>SOG%</b> (metieni vārtos ÷ visi metieni) tiek salīdzināts ar spēļu kopu, jo tam nav līdzvērtīga ārēja etalona.</li>
       </ul>
     </div>
 
     <hr class="method-divider">
 
-    <div class="method-axis-title">✋ Discipline</div>
+    <div class="method-axis-title">🛡 Aizsardzība</div>
+    <div class="method-weight-row">
+      <span class="method-weight-chip"><b>Ielaistie vārti laukumā</b> 40%</span>
+      <span class="method-weight-chip"><b>Bloķētie metieni</b> 40%</span>
+      <span class="method-weight-chip"><b>Komandas metienu starpība</b> 20%</span>
+    </div>
     <div class="method-body">
-      <p>PIM per game, inverted (fewer penalties = better), compared only against <b>same-position peers</b> — forwards vs. forwards, defensemen vs. defensemen — since the two take penalties at different rates for different reasons.</p>
+      <p>Visiem trim izmanto <b>fiksētus diapazonus</b>, nevis salīdzinājumu ar komandas biedriem. Katrs balstīts uz reāliem datiem vai šīs komandas novēroto izkliedi:</p>
+      <ul>
+        <li><b>Ielaistie vārti laukumā</b> (jo mazāk, jo labāk): vārti, kas ielaisti, kamēr spēlētājs ir laukumā. Vārti mazākumā un tukšos vārtos netiek skaitīti, ja ir apstiprināts, tieši kuri vārti tie bija (pēc katras spēles atzīmēm). Vārti, ko pretinieks guvis mūsu vairākumā, skaitās <i>vairāk</i> (1,25 reizes), jo tā ir lielāka individuāla kļūda. Piemēro arī maiņas koeficientu (3. maiņa ielaiž vairāk, jo pirmās maiņas spēlē vairāk un pret stiprākiem pretiniekiem): regulārajā sezonā 0,88 / 0,98 / 1,19; izslēgšanas spēlēs 0,78 / 1,00 / 1,50 (izslēgšanas spēlēs maiņas tiek saīsinātas). Fiksētais diapazons: <b>no 0,55 (labi) līdz 1,2 (vāji)</b>, pārbaudīts pret NHL rādītājiem, pārrēķinātiem amatieru ~15 minūšu spēlei.</li>
+        <li><b>Bloķētajiem metieniem</b> piemēro pozīcijas koeficientu (uzbrucējiem ×1,44, aizsargiem ×0,68, jo uzbrucēji bloķē retāk) un fiksētu diapazonu <b>no 0 līdz 1,5</b> bloķētiem metieniem spēlē.</li>
+        <li><b>Komandas metienu starpība</b>: komandas metieni mīnus pretinieku metieni spēlēs, kurās piedalījās šis spēlētājs, vidēji uz spēli. Tas ir aptuvenāks rādītājs ("kā komandai iet, kad šis spēlētājs spēlē"), nevis precīza individuāla uzskaite laukumā (tabulā tā netiek fiksēta), tāpēc tam ir mazāks svars – 20%. Fiksētais diapazons: <b>no -8 līdz +12</b>.</li>
+      </ul>
     </div>
 
     <hr class="method-divider">
 
-    <div class="method-axis-title">⭕ Faceoffs</div>
+    <div class="method-axis-title">✋ Disciplīna</div>
     <div class="method-body">
-      <p>Only shown for players who've actually taken draws. Faceoff win % on a fixed range: <b>40% (bad) to 60% (elite)</b>.</p>
+      <p>Soda minūtes uz spēli (jo mazāk, jo labāk), salīdzinot tikai ar <b>tās pašas pozīcijas spēlētājiem</b> – uzbrucējus ar uzbrucējiem, aizsargus ar aizsargiem –, jo viņi nopelna noraidījumus atšķirīgā biežumā un dažādu iemeslu dēļ.</p>
+    </div>
+
+    <hr class="method-divider">
+
+    <div class="method-axis-title">⭕ Iemetieni</div>
+    <div class="method-body">
+      <p>Rāda tikai spēlētājiem, kuri tiešām ir piedalījušies iemetienos. Uzvarēto iemetienu procents fiksētā diapazonā: <b>no 40% (vāji) līdz 60% (izcili)</b>.</p>
     </div>
   </div>
 
   <div class="panel method-section">
-    <h2 style="margin-top:0;">Goalie radar</h2>
-    <p class="method-body" style="margin-top:-6px;">All three goalie benchmarks below come from the real OlyBet EHL E5 league leaderboard (across the 2024-25 and 2025-26 seasons, both regular season and playoffs) — not this roster's own goalies, and not an NHL comparison.</p>
+    <h2 style="margin-top:0;">Vārtsargu radars</h2>
+    <p class="method-body" style="margin-top:-6px;">Visi trīs vārtsargu etaloni balstīti uz OlyBet EHL E5 līgas vārtsargu statistiku (2024-25 un 2025-26 sezonās, gan regulārajā sezonā, gan izslēgšanas spēlēs), nevis uz šīs komandas vārtsargiem vai NHL salīdzinājumu.</p>
 
     <hr class="method-divider">
 
-    <div class="method-axis-title">🥅 Save %</div>
+    <div class="method-axis-title">🥅 Atvairīto metienu %</div>
     <div class="method-body">
-      <p>Fixed range, split by season type since real league data showed playoff SV% runs meaningfully higher (tighter, more defensive playoff hockey):</p>
+      <p>Fiksēts diapazons, atsevišķi pa sezonas daļām, jo līgas dati rāda, ka izslēgšanas spēlēs SV% ir ievērojami augstāks (spēle ir saspringtāka un aizsardzībā drošāka):</p>
       <ul>
-        <li><b>Regular season:</b> 82% (bad) to 91% (elite)</li>
-        <li><b>Playoffs:</b> 86% (bad) to 93% (elite)</li>
+        <li><b>Regulārā sezona:</b> no 82% (vāji) līdz 91% (izcili)</li>
+        <li><b>Izslēgšanas spēles:</b> no 86% (vāji) līdz 93% (izcili)</li>
       </ul>
-      <p>Both derived from the real league's 10th/90th percentile split, filtered to goalies with a meaningful sample (5+ GP for season entries, 3+ GP for playoffs).</p>
+      <p>Abi diapazoni iegūti no līgas 10. un 90. procentiles, ņemot vērā tikai vārtsargus ar pietiekami daudz spēlēm (vismaz 5 regulārajā sezonā, vismaz 3 izslēgšanas spēlēs).</p>
     </div>
 
     <hr class="method-divider">
 
-    <div class="method-axis-title">✅ Quality Start %</div>
+    <div class="method-axis-title">✅ Kvalitatīvo spēļu %</div>
     <div class="method-body">
-      <p>The share of games where a goalie's <i>own SV% that specific game</i> met or beat the real league median for that season type — <b>87.8% in the regular season, 89.7% in playoffs</b> — the same methodology Rob Vollman's original NHL "Quality Start" stat uses, just applied with this league's real threshold instead of the NHL's. Scored on a fixed range of <b>30% to 80%</b>.</p>
+      <p>To spēļu daļa, kurās vārtsarga <i>konkrētās spēles SV%</i> sasniedza vai pārsniedza līgas mediānu attiecīgajā sezonas daļā – <b>87,8% regulārajā sezonā, 89,7% izslēgšanas spēlēs</b>. Metodika ir tāda pati kā Roba Volmana NHL "Quality Start" rādītājam, tikai ar šīs līgas slieksni. Fiksētais diapazons: <b>no 30% līdz 80%</b>.</p>
     </div>
 
     <hr class="method-divider">
 
-    <div class="method-axis-title">📊 Consistency</div>
+    <div class="method-axis-title">📊 Stabilitāte</div>
     <div class="method-body">
-      <p>The <b>downside deviation</b> of a goalie's per-game SV% — not full standard deviation. Only games <i>below</i> their own baseline count toward the penalty; a shutout or any great game above it contributes zero, since "inconsistent" should mean having bad nights, not good ones.</p>
-      <p>The baseline itself <b>excludes shutout games</b> when computing the average — otherwise a single shutout would pull the average up and make ordinary good games look "below average" when they aren't really bad nights at all.</p>
-      <div class="method-formula">baseline = average of all non-shutout games (or all games, if every game was a shutout)
-downside deviation = √( average of min(0, game SV% - baseline)² across all games )</div>
-      <p>Scored on a fixed range of <b>0 (perfectly steady) to 5.0 percentage points (erratic)</b> — grounded in this team's own observed spread across its goalies, not the league file, since the league data only has season-level totals for other teams, not per-game detail to compute a real spread from. Scored on the goalie's own numbers only, not compared against other goalies — with only a handful of goalies on one roster, that comparison was too noisy to be meaningful.</p>
+      <p>Vārtsarga SV% <b>novirze uz leju</b> pa spēlēm, nevis pilnā standartnovirze. Sodu dod tikai spēles, kas ir <i>zem</i> viņa paša vidējā līmeņa; "sausā" spēle vai jebkura spēle virs vidējā neko nesamazina, jo "nestabils" nozīmē sliktas spēles, nevis labas.</p>
+      <p>Pašu vidējo līmeni rēķina <b>bez "sausajām" spēlēm</b>, citādi viena "sausā" spēle paceltu vidējo, un parastas labas spēles izskatītos "zem vidējā", lai gan tās nemaz nav sliktas.</p>
+      <div class="method-formula">vidējais = visu spēļu vidējais, izņemot "sausās" (vai visas spēles, ja visas bija "sausās")
+novirze uz leju = √( vidējais no min(0, spēles SV% - vidējais)² visās spēlēs )</div>
+      <p>Fiksētais diapazons: <b>no 0 (pilnīgi stabils) līdz 5,0 procentpunktiem (nestabils)</b>. Tas balstīts uz šīs komandas vārtsargu novēroto izkliedi, nevis līgas failu, jo līgas datos par citām komandām ir tikai sezonas kopsummas, nevis katras spēles dati. Vērtējums balstās tikai uz paša vārtsarga skaitļiem, nevis salīdzinājumu ar citiem vārtsargiem, jo vienā komandā ir pārāk maz vārtsargu, lai salīdzinājums būtu jēgpilns.</p>
     </div>
   </div>
 </div>

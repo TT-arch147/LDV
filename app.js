@@ -235,8 +235,8 @@ statsSeasonSelect.value = defaultSeasonValue();
 let statsSortState = {key:'date', dir:-1};
 
 const SKATER_COLS = [
-  {key:'date', label:'Date', left:true},
-  {key:'opponent', label:'Opponent', left:true},
+  {key:'date', label:'Datums', left:true},
+  {key:'opponent', label:'Pretinieks', left:true},
   {key:'g', label:'G'}, {key:'a', label:'A'},
   {key:'shAtt', label:'Shots'}, {key:'sh', label:'SOG'}, {key:'shPct', label:'Shot%'},
   {key:'bl', label:'BLK'}, {key:'pim', label:'PIM'}, {key:'pimA', label:'PIM/A'},
@@ -244,8 +244,8 @@ const SKATER_COLS = [
   {key:'fow', label:'FOW/FOT', sortable:false}, {key:'foPct', label:'FO%'},
 ];
 const GOALIE_COLS = [
-  {key:'date', label:'Date', left:true},
-  {key:'opponent', label:'Opponent', left:true},
+  {key:'date', label:'Datums', left:true},
+  {key:'opponent', label:'Pretinieks', left:true},
   {key:'shotsFaced', label:'Shots faced'}, {key:'saves', label:'Saves'},
   {key:'ga', label:'GA'}, {key:'savePct', label:'SV%'},
 ];
@@ -819,6 +819,16 @@ function renderRadarChart(player, season, isGoalie){
   });
 }
 
+// opponent cell for the player game log: "vs" (home) or "@" (away), plus the team logo
+const GAME_HOME = {}; DATA.boxscores.forEach(b => { GAME_HOME[b.date] = b.lvIsHome; });
+const OPP_ALIAS = { 'Warriors':'Ice Warriors', 'Ice Wolves II':'Ice Wolves', 'Iecava/Mammoths':'Mammoths', 'Leģendas V':'Pilsētas Leģendas', 'Sparta II':'Sparta 2', 'Moltto Plus':'Moltto' };
+function oppCell(r){
+  const info = (DATA.teamAssets || {})[OPP_ALIAS[r.opponent] || r.opponent];
+  const home = GAME_HOME[r.date];
+  const ha = home === undefined ? '' : (home ? 'vs' : '@');
+  return `<span class="opp-cell"><span class="ha">${ha}</span>${info && info.logo ? `<img src="${teamLogo(OPP_ALIAS[r.opponent] || r.opponent)}" alt="">` : ''}${r.opponent}</span>`;
+}
+
 function renderStatsTab(){
   const player = statsPlayerSelect.value;
   const season = statsSeasonSelect.value;
@@ -837,7 +847,7 @@ function renderStatsTab(){
     document.querySelector('#statsTable tbody').innerHTML = rows.map(r=>`
       <tr class="expandable" data-date="${r.date}">
         <td style="text-align:left"><span class="chevron">▶</span>${r.date}</td>
-        <td style="text-align:left">${r.opponent}</td>
+        <td style="text-align:left">${oppCell(r)}</td>
         <td>${r.shotsFaced}</td><td>${r.saves}</td><td>${r.ga}</td><td>${r.savePct}%</td>
       </tr>`).join('') || `<tr><td colspan="6" style="color:var(--text-dim);text-align:center;padding:20px;">No games in this range</td></tr>`;
     wireStatsExpandableRows(6, player, true);
@@ -852,7 +862,7 @@ function renderStatsTab(){
       const foRatio = (r.fot!=null && r.fot>0) ? `${r.fow}/${r.fot}` : (r.fot===0 ? '0/0' : '—');
       return `<tr class="expandable" data-date="${r.date}">
         <td style="text-align:left"><span class="chevron">▶</span>${r.date}</td>
-        <td style="text-align:left">${r.opponent}</td>
+        <td style="text-align:left">${oppCell(r)}</td>
         <td>${r.g}</td><td>${r.a}</td>
         <td>${fmtNum(r.shAtt)}</td><td>${fmtNum(r.sh)}</td><td>${fmtPctVal(r.shPct)}</td>
         <td>${fmtNum(r.bl)}</td><td>${fmtNum(r.pim)}</td><td>${fmtNum(r.pimA)}</td>
@@ -941,7 +951,13 @@ function render(){
         const label = row.label==='gk' ? slot : slot.replace(/^\d+\s*/,'');
         const nr = name ? ROSTER_NR[name] : null;
         const photo = name ? (DATA.playerPhotos && DATA.playerPhotos[name]) : null;
-        const nameHtml = name ? (nr!=null ? `<span class="slot-nr">#${nr}</span> ${playerLink(name)}` : playerLink(name)) : '—';
+        // number + first name(s) on the first row, surname on the second
+        let nameHtml = '—';
+        if (name) {
+          const parts = name.split(' '), last = parts.length > 1 ? parts.pop() : '', first = parts.join(' ');
+          const inner = `<span class="nw">${nr!=null ? `<span class="slot-nr">#${nr}</span> ` : ''}${first}</span>${last ? '<br>' + last : ''}`;
+          nameHtml = KNOWN_PLAYERS.has(name) ? `<a href="javascript:void(0)" class="player-link" onclick="goToPlayerStats('${name.replace(/'/g, "\\'")}')">${inner}</a>` : inner;
+        }
         let statLine = '';
         if (name) {
           const sk = slotSkater(name);
@@ -949,7 +965,7 @@ function render(){
           else { const gk = slotGoalie(name); if (gk) statLine = `${gk.saves}/${gk.shotsFaced} SV · ${gk.savePct ?? '—'}%`; }
         }
         const photoHtml = photo ? `<img class="slot-photo" src="${photo}" alt="">` : (name ? `<div class="slot-photo slot-photo-empty"></div>` : '');
-        return `<div class="slot" style="border-color:${name?LV_COLOR+'55':'var(--line)'}">${photoHtml}<div class="slot-label">${label}</div><div class="slot-name">${nameHtml}</div>${statLine ? `<div class="slot-stat">${statLine}</div>` : ''}</div>`;
+        return `<div class="slot" data-n="${name || ''}" style="border-color:${name?LV_COLOR+'55':'var(--line)'}">${photoHtml}<div class="slot-label">${label}</div><div class="slot-name">${nameHtml}</div>${statLine ? `<div class="slot-stat">${statLine}</div>` : ''}</div>`;
       }).join('') + `</div>`;
     }).join('');
   } else {
@@ -957,6 +973,7 @@ function render(){
   }
 
   const tbody = document.querySelector('#skaterBoxTable tbody');
+  window.__BOX = { skaters: b.skaters || [], goalies: b.goalies || [], detail: skaterDetailHtml };   // used by the rink hover cards
   const fmt = (v, digits) => (v===null || v===undefined) ? '—' : (digits!=null ? Number(v).toFixed(digits) : v);
   const fmtPct = (v) => (v===null || v===undefined) ? '—' : Math.round(v*1000)/10 + '%';
   const fmtPM = (v) => (v===null || v===undefined) ? '—' : ((v>0?'+':'')+v);
@@ -1066,8 +1083,13 @@ const POS_GROUPS = [
   {key:'DEF', label:'Defense'},
   {key:'GK', label:'Goalies'},
 ];
+// Only this season's players: those listed on Ledus Veči's EHL team page (collected by refresh-data.js).
+// Until that list exists, everyone in the roster sheet is shown.
+const EHL_E5_IDS = new Set(((DATA.teamRosters && DATA.teamRosters.teams && DATA.teamRosters.teams.E5) || []).map(String));
+const personId = url => ((String(url || '').match(/\/personas\/[a-z0-9-]+\/(\d+)/) || [])[1]);
+const CURRENT_ROSTER = EHL_E5_IDS.size ? DATA.roster.filter(p => EHL_E5_IDS.has(personId(p.ehl))) : DATA.roster;
 document.getElementById('rosterSections').innerHTML = POS_GROUPS.map(g=>{
-  const players = DATA.roster.filter(p=>p.position===g.key);
+  const players = CURRENT_ROSTER.filter(p=>p.position===g.key);
   if(!players.length) return '';
   return `<div class="roster-section-title">${g.label}</div>
     <div class="roster-grid">${players.map(rosterCard).join('')}</div>`;
@@ -1108,8 +1130,17 @@ function renderTeamStats(){
     {label:'GOALS AGAINST', val:ga, cls:'loss'},
     {label:'DIFFERENTIAL', val:(diff>0?'+':'')+diff, cls: diff>0?'win':(diff<0?'loss':'')},
   ];
-  document.getElementById('teamRecordStrip').innerHTML = cells.map(c=>`
-    <div class="record-cell"><div class="record-num ${c.cls}">${c.val}</div><div class="record-label">${c.label}</div></div>`).join('');
+  const rs = document.getElementById('teamRecordStrip');
+  rs.classList.add('rec2-wrap');
+  const gfShare = (gf + ga) ? gf / (gf + ga) * 100 : 50;
+  rs.innerHTML = `<div class="rec2">
+    <div class="rec-ring" style="background:conic-gradient(var(--win) 0 ${winPct}%, var(--loss) ${winPct}% 100%)"><div><b>${winPct}%</b><span>uzvaras</span></div></div>
+    <div class="rec-side">
+      <div class="rec-top"><div class="rec-gp"><b>${gp}</b><span>spēles</span></div>
+        <div class="rec-pills"><span class="pill w"><b>${w}</b> W</span><span class="pill l"><b>${l}</b> L</span>${d ? `<span class="pill d"><b>${d}</b> D</span>` : ''}</div></div>
+      <div class="rec-goals"><div class="t"><span>Gūtie <b class="g">${gf}</b></span><span class="df ${diff > 0 ? 'pos' : diff < 0 ? 'neg' : ''}">${(diff > 0 ? '+' : '') + diff}</span><span><b class="a">${ga}</b> Ielaistie</span></div>
+        <div class="duel"><span class="g" style="width:${gfShare}%"></span><span class="a" style="width:${100 - gfShare}%"></span></div></div>
+    </div></div>`;
 
   // ---- season totals & averages ----
   function gameFields(b){
@@ -1153,31 +1184,41 @@ function renderTeamStats(){
     ['GA', t.ga, gp>0?fmtNumT(t.ga/gp,1):'—'],
     ['Shots', t.shots, gp>0?fmtNumT(t.shots/gp,1):'—'],
     ['SA', t.sa, gp>0?fmtNumT(t.sa/gp,1):'—'],
-    ['Shot%', fmtPctT(shotPct), fmtPctT(shotPct)],
-    ['Save%', fmtPctT(savePct), fmtPctT(savePct)],
+    ['Shot%', fmtPctT(shotPct), null],
+    ['Save%', fmtPctT(savePct), null],
     ['BLK', t.blk, gp>0?fmtNumT(t.blk/gp,1):'—'],
     ['PIM', t.pim, gp>0?fmtNumT(t.pim/gp,1):'—'],
     ['PIM/A', t.pimA, gp>0?fmtNumT(t.pimA/gp,1):'—'],
     ['FOW', t.fow, gp>0?fmtNumT(t.fow/gp,1):'—'],
     ['FOL', t.fol, gp>0?fmtNumT(t.fol/gp,1):'—'],
-    ['FO%', fmtPctT(foPct), fmtPctT(foPct)],
-    ['PP', `${t.ppScored}/${t.pp}`, gp>0?fmtNumT(t.pp/gp,1):'—'],
-    ['PP%', fmtPctT(ppPct), fmtPctT(ppPct)],
+    ['FO%', fmtPctT(foPct), null],
+    ['PP', `${t.ppScored}/${t.pp}`, gp>0?`${Math.round(t.ppScored/gp)}/${Math.round(t.pp/gp)}`:'—'],
+    ['PP%', fmtPctT(ppPct), null],
     ['SH', t.sh, gp>0?fmtNumT(t.sh/gp,2):'—'],
-    ['PK', `${t.pkScored}/${t.pk}`, gp>0?fmtNumT(t.pk/gp,1):'—'],
-    ['PK%', fmtPctT(pkPct), fmtPctT(pkPct)],
+    ['PK', `${t.pkScored}/${t.pk}`, gp>0?`${Math.round(t.pkScored/gp)}/${Math.round(t.pk/gp)}`:'—'],
+    ['PK%', fmtPctT(pkPct), null],
     ['GA/PP', t.gaPP, gp>0?fmtNumT(t.gaPP/gp,2):'—'],
   ];
+  // grouped, with a small bar for the percentages
+  const PCTV = { 'Shot%': shotPct, 'Save%': savePct, 'FO%': foPct, 'PP%': ppPct, 'PK%': pkPct };
+  const GROUPS = [['Uzbrukums', ['G','Shots','Shot%']], ['Aizsardzība', ['GA','SA','Save%','BLK']], ['Iemetieni', ['FOW','FOL','FO%']],
+    ['Disciplīna', ['PIM','PIM/A']], ['Vairākums / mazākums', ['PP','PP%','SH','PK','PK%','GA/PP']]];
+  const byLabel = {}; statDefs.forEach(d => byLabel[d[0]] = d);
   document.querySelector('#teamTotalsTable tbody').innerHTML = games.length ?
-    statDefs.map(([label, total, avg])=>
-      `<tr><td style="text-align:left">${label}</td><td>${total}</td><td>${avg}</td></tr>`
-    ).join('') :
+    GROUPS.map(([title, labels]) => `<tr class="tt-group"><td colspan="3">${title}</td></tr>` + labels.map(l => {
+      const [label, total, avg] = byLabel[l];
+      if (avg === null) {
+        const v = PCTV[l]; const w = v == null ? 0 : Math.max(0, Math.min(100, v * 100));
+        return `<tr class="tt-pct"><td style="text-align:left">${label}</td><td colspan="2"><div class="tt-pv"><div class="tt-bar"><span style="width:${w}%"></span></div><b>${total}</b></div></td></tr>`;
+      }
+      return `<tr><td style="text-align:left">${label}</td><td>${total}</td><td>${avg}</td></tr>`;
+    }).join('')).join('') :
     `<tr><td colspan="3" style="color:var(--text-dim);text-align:center;padding:20px;">No games in this range</td></tr>`;
 
   // ---- by period ----
   const periods = ['1st','2nd','3rd','OT'];
   const periodTotals = {};
-  periods.forEach(p=>{ periodTotals[p] = {g:0, ga:0, s:0, sa:0, any:false}; });
+  periods.forEach(p=>{ periodTotals[p] = {g:0, ga:0, s:0, sa:0, fow:0, fol:0, any:false}; });
   games.forEach(b=>{
     periods.forEach(p=>{
       const d = b.periods && b.periods[p];
@@ -1185,13 +1226,17 @@ function renderTeamStats(){
       if(d.g!=null || d.ga!=null || d.s!=null || d.sa!=null) periodTotals[p].any = true;
       periodTotals[p].g += d.g||0; periodTotals[p].ga += d.ga||0;
       periodTotals[p].s += d.s||0; periodTotals[p].sa += d.sa||0;
+      periodTotals[p].fow += d.fow||0; periodTotals[p].fol += d.fol||0;
     });
   });
   document.querySelector('#teamPeriodTable tbody').innerHTML = periods.map(p=>{
     const d = periodTotals[p];
     if(!d.any) return '';
     const gDiff = d.g-d.ga, sDiff = d.s-d.sa;
-    return `<tr><td style="text-align:left">${p}</td><td>${d.g}</td><td>${d.ga}</td><td>${(gDiff>0?'+':'')+gDiff}</td><td>${d.s}</td><td>${d.sa}</td><td>${(sDiff>0?'+':'')+sDiff}</td></tr>`;
+    const duel = (lbl, f, ag, df, cls) => { const sh = (f + ag) ? f / (f + ag) * 100 : 50;
+      return `<div class="pd"><div class="lbl">${lbl}</div><div class="t"><b>${f}</b><span class="sep">:</span><b class="ag">${ag}</b><span class="df ${df > 0 ? 'pos' : df < 0 ? 'neg' : ''}">${(df > 0 ? '+' : '') + df}</span></div>
+        <div class="duel ${cls}"><span class="g" style="width:${sh}%"></span><span class="a" style="width:${100 - sh}%"></span></div></div>`; };
+    return `<tr class="pr"><td class="pn">${p}</td><td colspan="6"><div class="pr-grid">${duel('Vārti', d.g, d.ga, gDiff, '')}${duel('Metieni', d.s, d.sa, sDiff, 'sh')}${duel('Iemetieni', d.fow, d.fol, d.fow - d.fol, 'fo')}</div></td></tr>`;
   }).join('') || `<tr><td colspan="7" style="color:var(--text-dim);text-align:center;padding:20px;">No period data</td></tr>`;
 
   // ---- game log ----
@@ -1216,7 +1261,7 @@ function renderTeamStats(){
     const gPpPct = f.pp>0 ? f.ppScored/f.pp : null;
     const gPkPct = f.pk>0 ? f.pkScored/f.pk : null;
     return `<tr class="expandable" data-date="${b.date}">
-      <td><span class="chevron">▶</span>${b.date}</td><td style="text-align:left">${opp}</td>
+      <td><span class="chevron">▶</span>${b.date}</td><td style="text-align:left">${oppCell({ date: b.date, opponent: opp })}</td>
       <td>${f.g}</td><td>${f.ga}</td><td>${fmtPctT(gShotPct)}</td><td>${fmtPctT(gSavePct)}</td>
       <td>${f.ppScored}/${f.pp}</td><td>${fmtPctT(gPpPct)}</td>
       <td>${f.pkScored}/${f.pk}</td><td>${fmtPctT(gPkPct)}</td>
@@ -1299,7 +1344,9 @@ function renderLeagueGroup(elId, teams) {
     const logoObj = DATA.teamAssets && DATA.teamAssets[map.logoKey || display];
     const logo = logoObj && logoObj.logo;
     const nameCell = logo ? `<img class="league-logo" src="${logo}" alt="">${display}` : display;
-    return `<tr class="${classes}"><td>${nameCell}</td><td>${t.gp}</td><td>${t.points}</td></tr>`;
+    const st = (DATA.leagueStats && DATA.leagueStats.teams || {})[String(t.team).toUpperCase()] || {};
+    const pc = v => v == null ? '—' : Math.round(v) + '%';
+    return `<tr class="${classes}"><td>${nameCell}</td><td>${t.gp}</td><td>${st.gf ?? '—'}</td><td>${st.ga ?? '—'}</td><td>${pc(st.pp)}</td><td>${pc(st.pk)}</td><td class="pts">${t.points}</td></tr>`;
   }).join('');
 }
 if (DATA.leagueTable && DATA.leagueTable.divisions) {
@@ -1317,11 +1364,19 @@ if (DATA.upcomingGames && DATA.upcomingGames.length) {
     const logoObj = DATA.teamAssets && DATA.teamAssets[CAL_LOGO_ALIAS[g.opponent] || g.opponent];
     const logo = logoObj && logoObj.logo;
     const oppCell = logo ? `<img class="league-logo" src="${logo}" alt="">${g.opponent}` : g.opponent;
-    const when = g.date ? `${g.weekday ? g.weekday + ', ' : ''}${g.date}` : '';
+    // short form: "Sestd., 10. okt."
+    const WDS = { pirmdiena:'Pirmd.', otrdiena:'Otrd.', trešdiena:'Trešd.', ceturtdiena:'Ceturtd.', piektdiena:'Piektd.', sestdiena:'Sestd.', svētdiena:'Svētd.' };
+    const MS = { janv:'janv.', febr:'febr.', mart:'marts', apr:'apr.', maij:'maijs', jūn:'jūn.', jūl:'jūl.', aug:'aug.', sept:'sept.', okt:'okt.', nov:'nov.', dec:'dec.' };
+    const wd = g.weekday ? (WDS[String(g.weekday).toLowerCase()] || g.weekday) : '';
+    const dm = String(g.date || '').match(/(\d{1,2})\.?\s*([A-Za-zĀ-ž]+)/);
+    const mk = dm ? Object.keys(MS).find(k => dm[2].toLowerCase().startsWith(k)) : null;
+    const dateShort = dm ? `${dm[1]}. ${mk ? MS[mk] : dm[2]}` : (g.date || '');
+    const when = g.date ? `${wd ? wd + ', ' : ''}${dateShort}` : '';
+    const arena = g.arena ? String(g.arena).toLowerCase().replace(/(^|[\s/-])\S/g, c => c.toUpperCase()) : '';
     return `
     <div class="calendar-row">
       <div class="calendar-opp"><span class="vs">${g.isHome ? 'vs' : 'at'}</span>${oppCell}</div>
-      <div class="calendar-when">${when}${when ? ' · ' : ''}${g.time || ''}${g.arena ? ' · ' + g.arena : ''}</div>
+      <div class="calendar-when">${when}${when ? ' · ' : ''}${g.time || ''}${arena ? ' · ' + arena : ''}</div>
     </div>`;
   }).join('');
 }
@@ -1338,17 +1393,18 @@ renderStatsTab();
   // the regular weekly practice; extra or cancelled practices come from the Practices sheet tab
   const PRACTICE = { weekday: 1, time: '21:15', rink: 'Akropole', seasonStart: '09-01', seasonEnd: '04-30' };   // weekday 1 = Monday
   const SHOW_AGE = false;   // true = show the age a player is turning on their birthday
-  const TYPES = { game: 'Games', practice: 'Practices', bday: 'Birthdays', nday: 'Name days' };
+  const TYPES = { E5: 'E5', E7: 'E7', E9: 'E9', practice: 'Practices', bday: 'Birthdays', nday: 'Name days' };
   const ORDER = { game: 0, practice: 1, bday: 2, nday: 3 };
   const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-  const shown = { game: true, practice: true, bday: true, nday: true };
+  const shown = { E5: true, E7: true, E9: true, practice: true, bday: true, nday: true };
 
   const pad = n => String(n).padStart(2, '0');
   const iso = (y, m, d) => `${y}-${pad(m + 1)}-${pad(d)}`;
   const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const titleCase = s => String(s || '').toLowerCase().replace(/(^|[\s/-])\S/g, c => c.toUpperCase());
   const now = new Date(), todayIso = iso(now.getFullYear(), now.getMonth(), now.getDate());
-  const rosterNames = new Set(DATA.roster.map(p => p.name));
+  // birthdays and name days only for this season's players (EHL roster, see the Sastāvs tab)
+  const rosterNames = new Set((typeof CURRENT_ROSTER !== 'undefined' ? CURRENT_ROSTER : DATA.roster).map(p => p.name));
   const firstName = n => n.split(' ')[0];
 
   // the EHL calendar gives dates like "10. Oktobris" (no year) - turn them into YYYY-MM-DD
@@ -1371,17 +1427,29 @@ renderStatsTab();
     const home = b.lvIsHome, opp = home ? b.awayTeam : b.homeTeam;
     const us = home ? b.htGoals : b.atGoals, them = home ? b.atGoals : b.htGoals;
     const score = us != null && us !== '' ? ` · ${us}–${them}${b.result ? ' ' + b.result : ''}` : '';
-    fixed.push({ date: b.date, type: 'game', short: `${home ? 'vs' : 'at'} ${opp}`, text: `${home ? 'vs' : 'at'} ${opp}${score}` });
+    fixed.push({ date: b.date, type: 'game', div: 'E5', ha: home ? 'vs' : '@', opp, sub: us != null && us !== '' ? `${us}-${them}${b.result ? ' ' + b.result : ''}` : '',
+      short: `${home ? 'vs' : 'at'} ${opp}`, text: `E5 · ${home ? 'vs' : 'at'} ${opp}${score}` });
   });
   (DATA.upcomingGames || []).forEach(g => {
     const d = upcomingIso(g);
     if (!d || fixed.some(f => f.type === 'game' && f.date === d)) return;
     const where = [g.time, g.arena ? titleCase(g.arena) : ''].filter(Boolean).join(' · ');
-    fixed.push({ date: d, type: 'game', short: `${g.isHome ? 'vs' : 'at'} ${g.opponent}`, text: `${g.isHome ? 'vs' : 'at'} ${g.opponent}${where ? ' · ' + where : ''}` });
+    fixed.push({ date: d, type: 'game', div: 'E5', ha: g.isHome ? 'vs' : '@', opp: g.opponent, sub: where,
+      short: `${g.isHome ? 'vs' : 'at'} ${g.opponent}`, text: `E5 · ${g.isHome ? 'vs' : 'at'} ${g.opponent}${where ? ' · ' + where : ''}` });
+  });
+  // Ledus Veči II (E7) and III (E9) games from the EHL calendar
+  ['E7', 'E9'].forEach(div => {
+    const t = DATA.club && DATA.club[div]; if (!t || !t.games) return;
+    t.games.forEach(g => {
+      if (!g.date || fixed.some(f => f.div === div && f.date === g.date)) return;
+      const home = g.home.abbr === t.abbr, o = home ? g.away : g.home, opp = (t.names || {})[o.abbr] || o.abbr;
+      const sub = g.played ? `${home ? g.hg : g.ag}-${home ? g.ag : g.hg}` : [g.time, g.arena ? titleCase(g.arena) : ''].filter(Boolean).join(' · ');
+      fixed.push({ date: g.date, type: 'game', div, ha: home ? 'vs' : '@', opp, sub, short: `${home ? 'vs' : 'at'} ${opp}`, text: `${div} · ${home ? 'vs' : 'at'} ${opp}${sub ? ' · ' + sub : ''}` });
+    });
   });
   const extras = DATA.practiceExtras || [];
   const cancelled = new Set(extras.filter(x => x.cancelled).map(x => x.date));
-  extras.filter(x => !x.cancelled).forEach(x => fixed.push({ date: x.date, type: 'practice',
+  extras.filter(x => !x.cancelled).forEach(x => fixed.push({ date: x.date, type: 'practice', sub: [x.time, x.rink].filter(Boolean).join(' · '),
     short: 'Extra practice', text: ['Extra practice', x.time, x.rink, x.note].filter(Boolean).join(' · ') }));
 
   function inSeason(md){
@@ -1393,22 +1461,47 @@ renderStatsTab();
     const [y, m, d] = ds.split('-').map(Number), md = ds.slice(5);
     const out = fixed.filter(e => e.date === ds);
     if (new Date(y, m - 1, d).getDay() === PRACTICE.weekday && inSeason(md) && !cancelled.has(ds))
-      out.push({ type: 'practice', short: 'Practice', text: `Practice ${PRACTICE.time} · ${PRACTICE.rink}` });
+      out.push({ type: 'practice', sub: `${PRACTICE.time} · ${PRACTICE.rink}`, short: 'Practice', text: `Practice ${PRACTICE.time} · ${PRACTICE.rink}` });
     Object.entries(DATA.birthdays || {}).forEach(([n, b]) => {
       if (rosterNames.has(n) && b && b.slice(5) === md)
-        out.push({ type: 'bday', short: firstName(n), text: `Birthday: ${n}${SHOW_AGE ? ` (${y - Number(b.slice(0, 4))})` : ''}` });
+        out.push({ type: 'bday', name: n, short: firstName(n), text: `Birthday: ${n}${SHOW_AGE ? ` (${y - Number(b.slice(0, 4))})` : ''}` });
     });
     Object.entries(DATA.nameDays || {}).forEach(([n, v]) => {
       if (rosterNames.has(n) && v && v.d === md)
-        out.push({ type: 'nday', short: firstName(n), text: `Name day: ${n}${v.special ? ' (day of uncommon names)' : ''}` });
+        out.push({ type: 'nday', name: n, short: firstName(n), text: `Name day: ${n}${v.special ? ' (day of uncommon names)' : ''}` });
     });
-    return out.filter(e => shown[e.type]).sort((a, b) => ORDER[a.type] - ORDER[b.type]);
+    // players on this season's EHL roster who aren't in the roster sheet (birthday + name day from their EHL profile)
+    const R = DATA.teamRosters, ehlIds = (R && R.teams && R.teams.E5) || [];
+    ehlIds.forEach(id => { const pp = R.people && R.people[id]; if (!pp || rosterNames.has(pp.name)) return;
+      if (pp.birthday && pp.birthday.slice(5) === md) out.push({ type: 'bday', name: pp.name, short: firstName(pp.name), text: `Birthday: ${pp.name}` });
+      if (pp.nameDay && pp.nameDay.d === md) out.push({ type: 'nday', name: pp.name, short: firstName(pp.name), text: `Name day: ${pp.name}${pp.nameDay.special ? ' (day of uncommon names)' : ''}` });
+    });
+    return out.filter(e => e.type === 'game' ? shown[e.div] : shown[e.type]).sort((a, b) => ORDER[a.type] - ORDER[b.type] || String(a.div).localeCompare(String(b.div)));
   }
 
   const dayLabel = ds => { const [y, m, d] = ds.split('-').map(Number); return `${d} ${MONTHS[m - 1].slice(0, 3)}`; };
-  const rowHtml = (e, ds) => `<div class="cal-row t-${e.type}">${ds ? `<span class="when">${dayLabel(ds)}</span>` : ''}<span class="cal-dot"></span><span>${esc(e.text)}</span></div>`;
+  const rowHtml = (e, ds) => `<div class="cal-row t-${e.type === 'game' ? e.div : e.type}">${ds ? `<span class="when">${dayLabel(ds)}</span>` : ''}<span class="cal-dot"></span><span>${esc(e.text)}</span></div>`;
 
   let viewY = now.getFullYear(), viewM = now.getMonth(), selected = todayIso;
+
+  // one event inside a day cell: games and practices as "vs/@ + logo" with time and place below,
+  // birthdays and name days as plain "Name (type)"
+  const OPP_LOGO_ALIAS = { 'Warriors':'Ice Warriors', 'Ice Wolves II':'Ice Wolves', 'Iecava/Mammoths':'Mammoths', 'Leģendas V':'Pilsētas Leģendas', 'Sparta II':'Sparta 2', 'Moltto Plus':'Moltto' };
+  const WHISTLE = '<svg class="ce-ic" viewBox="0 0 1200 1100" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="56" stroke-linecap="round" stroke-linejoin="round"><path d="M70 383 H527 V550 L622 383 H757 A300 300 0 0 1 757 983 A300 300 0 0 1 490 830 C440 740 350 660 240 637 C205 629 185 625 157 625 C135 625 120 640 105 660 C90 676 75 672 64 672 C42 672 22 652 22 625 L24 430 C24 405 45 383 70 383 Z"/><path d="M120 503 V630"/><circle cx="1115" cy="685" r="60"/><path d="M623 240 L672 118 M718 265 L937 45"/></svg>';
+  function oppLogo(name){
+    const k = OPP_LOGO_ALIAS[name] || name, info = DATA.teamAssets && DATA.teamAssets[k];
+    if (info && info.logo) return `<img class="ce-logo" src="${teamLogo(k)}" alt="" title="${esc(name)}">`;
+    return `<span class="ce-ini" title="${esc(name)}">${esc(String(name).split(/\s+/).map(w => w[0]).join('').slice(0, 3).toUpperCase())}</span>`;
+  }
+  function cellItem(e, solo){
+    if (e.type === 'game') return `<span class="ce ce-g d-${e.div}${solo ? ' solo' : ''}" title="${esc(e.text)}"><span class="ce-top"><span class="ha">${e.ha}</span>${oppLogo(e.opp)}</span>${e.sub ? `<span class="ce-sub">${esc(e.sub)}</span>` : ''}</span>`;
+    if (e.type === 'practice') return `<span class="ce ce-p${solo ? ' solo' : ''}" title="${esc(e.text)}"><span class="ce-top">${WHISTLE}</span>${e.sub ? `<span class="ce-sub">${esc(e.sub)}</span>` : ''}</span>`;
+    const icon = e.type === 'bday'
+      ? '<svg class="ce-pi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16M5 20v-7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v7M5 15c1.5 1 3 1 4.5 0s3-1 4.5 0 3 1 5 0M12 11V8M12 5.5c.8-.9.8-1.7 0-2.5-.8.8-.8 1.6 0 2.5z"/></svg>'
+      : '<svg class="ce-pi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>';
+    const nm = String(e.name || e.short), parts = nm.split(' '), last = parts.length > 1 ? parts.pop() : '';
+    return `<span class="ce ce-t${solo ? ' solo' : ''}">${icon}<span class="ce-pn"><b>${esc(parts.join(' '))}${last ? ' ' + esc(last) : ''}</b><small>${e.type === 'bday' ? 'dzimšanas diena' : 'vārda diena'}</small></span></span>`;
+  }
 
   function renderCalendar(){
     document.getElementById('calTitle').textContent = `${MONTHS[viewM]} ${viewY}`;
@@ -1422,8 +1515,8 @@ renderStatsTab();
       const ds = iso(viewY, viewM, d), ev = eventsOn(ds);
       const cls = ['cal-day', ds === todayIso ? 'today' : '', ds === selected ? 'sel' : '', ds < todayIso ? 'past' : ''].filter(Boolean).join(' ');
       html += `<button class="${cls}" data-date="${ds}"><span class="cal-num">${d}</span>
-        <span class="cal-items">${ev.map(e => `<span class="cal-item t-${e.type}" title="${esc(e.text)}">${esc(e.short)}</span>`).join('')}</span>
-        <span class="cal-dots">${ev.map(e => `<span class="cal-dot t-${e.type}"></span>`).join('')}</span></button>`;
+        <span class="cal-items">${ev.map(e => cellItem(e, ev.length === 1)).join('')}</span>
+        <span class="cal-dots">${ev.map(e => `<span class="cal-dot t-${e.type === 'game' ? e.div : e.type}"></span>`).join('')}</span></button>`;
     }
     document.getElementById('calGrid').innerHTML = html;
 
@@ -1495,8 +1588,8 @@ renderStatsTab();
 
   // player scoring: points, then goals, then +/-, then fewer games played
   const sk = {};
-  DATA.skaterRows.filter(r => r.season.includes(yrs)).forEach(r => { const p = sk[r.player] || (sk[r.player] = { gp: 0, g: 0, a: 0, pm: 0, pim: 0 });
-    p.gp++; p.g += r.g || 0; p.a += r.a || 0; p.pm += r.pm || 0; p.pim += r.pim || 0; });
+  DATA.skaterRows.filter(r => r.season.includes(yrs)).forEach(r => { const p = sk[r.player] || (sk[r.player] = { gp: 0, g: 0, a: 0, pm: 0, sog: 0, pim: 0 });
+    p.gp++; p.g += r.g || 0; p.a += r.a || 0; p.pm += r.pm || 0; p.sog += r.sh || 0; p.pim += r.pim || 0; });
   const skaters = Object.entries(sk).map(([n, p]) => ({ n, ...p, p: p.g + p.a }))
     .sort((x, y) => y.p - x.p || y.g - x.g || y.pm - x.pm || x.gp - y.gp || x.n.localeCompare(y.n));
   const gl = {};
@@ -1512,25 +1605,25 @@ renderStatsTab();
   const upcoming = (DATA.upcomingGames || []).map(g => ({ g, d: upIso(g) })).filter(x => x.d && x.d >= today).sort((x, y) => x.d < y.d ? -1 : 1).slice(0, 6);
 
   const sign = n => n > 0 ? '+' + n : String(n);
-  const resultsHtml = `<div class="scroll-x"><table class="ovt"><tr><th>Date</th><th>Opponent</th><th class="num">Score</th><th></th></tr>
+  const resultsHtml = `<div class="scroll-x"><table class="ovt"><tr><th>Datums</th><th>Pretinieks</th><th class="num">Score</th><th></th></tr>
     ${games.slice().reverse().map(g => `<tr><td>${shortDate(g.date)}</td><td>${g.home ? 'vs' : '@'} ${logo(g.opp)}${esc(g.opp)}</td>
       <td class="num">${g.us}-${g.them}<span class="r ${g.r}">${g.r}</span></td><td class="num"><a href="#stats" data-boxdate="${g.date}">Boxscore</a></td></tr>`).join('')}</table></div>`;
   const upcomingHtml = upcoming.map(({ g, d }) => `<div class="ov-up"><span class="when">${shortDate(d)}</span>
     <span>${g.isHome ? 'vs' : '@'} ${logo(g.opponent)}${esc(g.opponent)}${g.time ? ' · ' + g.time : ''}${g.arena ? ' · ' + esc(nice(g.arena)) : ''}</span></div>`).join('')
     || '<div class="empty-note">Nothing scheduled yet</div>';
   const scoringRows = skaters.map((p, i) => `<tr${i >= 10 ? ' class="extra" style="display:none"' : ''}><td class="name">${esc(p.n)}</td><td class="num">${p.gp}</td><td class="num">${p.g}</td>
-    <td class="num">${p.a}</td><td class="num"><b>${p.p}</b></td><td class="num">${sign(p.pm)}</td><td class="num">${p.pim}</td></tr>`).join('');
+    <td class="num">${p.a}</td><td class="num"><b>${p.p}</b></td><td class="num">${sign(p.pm)}</td><td class="num">${p.sog}</td><td class="num">${p.pim}</td></tr>`).join('');
   const goalies = Object.entries(gl);
   const tableHtml = d => `<table class="ovt"><tr><th>#</th><th>Team</th><th class="num">GP</th><th class="num">PTS</th></tr>
-    ${d.teams.map((t, i) => `<tr class="${up(t.team) === up(LV) ? 'me' : ''}"><td>${i + 1}</td><td class="name">${logo(t.team)}${esc(nice(t.team))}</td><td class="num">${t.gp ?? ''}</td><td class="num">${t.points ?? ''}</td></tr>`).join('')}</table>`;
+    ${d.teams.map((t, i) => `<tr class="${[up(t.team) === up(LV) ? 'me' : '', i === 2 ? 'cut' : ''].join(' ')}"><td>${i + 1}</td><td class="name">${logo(t.team)}${esc(nice(t.team))}</td><td class="num">${t.gp ?? ''}</td><td class="num">${t.points ?? ''}</td></tr>`).join('')}</table>`;
 
   el.innerHTML = `
     <div class="ov-head"><img src="${teamLogo(LV)}" alt=""><div><div style="display:flex;align-items:center;gap:10px"><span class="div-badge">E5</span><span class="ov-title">${LV}</span></div>
-      <div class="ov-sub">Season ${yrs} · from our game sheet</div></div>
-      <div class="ov-stats"><div class="ov-stat"><b>${W}-${L}</b><span>Record</span></div>
-        <div class="ov-stat"><b>${ourPos >= 0 ? ord(ourPos + 1) : '-'}</b><span>${ourPos >= 0 ? esc(nice(divs[ourDiv].division)) : 'E5'}</span></div>
-        <div class="ov-stat"><b>${ourPos >= 0 ? divs[ourDiv].teams[ourPos].points : '-'}</b><span>Points</span></div>
-        <div class="ov-stat"><b>${GF}-${GA}</b><span>Goals</span></div></div></div>
+      <div class="ov-sub">Season ${yrs}</div></div>
+      <div class="ov-stats"><div class="ov-stat"><b>${W}-${L}</b><span>Bilance</span></div>
+        <div class="ov-stat"><b>${ourPos >= 0 ? (ourPos + 1) + '. vieta' : '-'}</b><span>${ourPos >= 0 ? esc(nice(divs[ourDiv].division)) : 'E5'}</span></div>
+        <div class="ov-stat"><b>${ourPos >= 0 ? divs[ourDiv].teams[ourPos].points : '-'}</b><span>Punkti</span></div>
+        <div class="ov-stat"><b>${GF}-${GA}</b><span>Vārtu attiecība</span></div></div></div>
     <div class="ov-grid">
       <div>
         <div class="panel ov-switch"><div class="panel-head"><span class="league-group-title">Games</span>${chips(['Results', 'Upcoming'], 0)}</div>${parts([resultsHtml, upcomingHtml], 0)}</div>
@@ -1538,7 +1631,7 @@ renderStatsTab();
           ${goalies.map(([n, g]) => `<tr><td class="name">${esc(n)}</td><td class="num">${g.gp}</td><td class="num">${g.sa}</td><td class="num">${g.sv}</td><td class="num">${g.ga}</td><td class="num"><b>${g.sa ? (100 * g.sv / g.sa).toFixed(1) + '%' : '-'}</b></td></tr>`).join('')}</table></div>` : ''}
       </div>
       <div>
-        <div class="panel"><div class="panel-head"><span class="league-group-title">Player scoring</span></div><div class="scroll-x"><table class="ovt" id="ovScoring"><tr><th>Player</th><th class="num">GP</th><th class="num">G</th><th class="num">A</th><th class="num">P</th><th class="num">+/-</th><th class="num">PIM</th></tr>${scoringRows}</table></div>
+        <div class="panel"><div class="panel-head"><span class="league-group-title">Player scoring</span></div><div class="scroll-x"><table class="ovt" id="ovScoring"><tr><th>Player</th><th class="num">GP</th><th class="num">G</th><th class="num">A</th><th class="num">P</th><th class="num">+/-</th><th class="num">SOG</th><th class="num">PIM</th></tr>${scoringRows}</table></div>
           ${skaters.length > 10 ? `<button class="more-btn" id="ovMore">Show all ${skaters.length} players</button>` : ''}</div>
       </div>
       <div>
@@ -1685,7 +1778,7 @@ renderStatsTab();
       matchHtml = `<div class="match-top"><div><div class="match-label"><span class="div-badge">${t.div}</span><span class="league-group-title" style="margin:0">Next game</span></div>
           <div class="match-when">${[fmt(n.date), n.time, n.arena].filter(Boolean).join(' · ')}</div></div><span class="countdown">${cd}</span></div>
         <div class="match-teams">${side(...L)}<div class="match-vs">VS</div>${side(...R, true)}</div>
-        <div class="match-foot">${t.h2h.length ? `<span>Head-to-head <b>${w}-${l}</b></span>${lm ? `<span>Last meeting <b>${lm.us}-${lm.them} ${lm.result}</b>, ${fmt(lm.date)} ${lm.date.slice(0, 4)}${lm.link ? ' · ' + boxLink(lm.link, 'Boxscore') : ''}</span>` : ''}` : '<span>First meeting</span>'}</div>`;
+        <div class="match-foot">${t.h2h.length ? `<span>Head-to-head <b>${w}-${l}</b></span>${lm ? `<span>Last meeting <b>${lm.us}-${lm.them}</b><span class="home-res ${lm.result}">${lm.result}</span> ${fmt(lm.date)} ${lm.date.slice(0, 4)}${lm.link ? ' · ' + boxLink(lm.link, 'Boxscore') : ''}</span>` : ''}` : '<span>First meeting</span>'}</div>`;
     } else {
       matchHtml = `<div class="match-label"><span class="div-badge">${t.div}</span><span class="league-group-title" style="margin:0">Next game</span></div><div class="empty-note">No upcoming games in the EHL calendar yet</div>`;
     }
@@ -1733,3 +1826,215 @@ renderStatsTab();
   document.querySelectorAll('.sponsor').forEach(a => { if (!a.getAttribute('href')) { a.removeAttribute('href'); a.style.cursor = 'default'; } });
 })();
 showSection(location.hash.slice(1) || 'home');
+
+// ---------------- Season picker with season badges ----------------
+// Replaces the look of the season dropdowns; the original <select> stays (hidden) and still drives everything.
+(function(){
+  const badge = v => {
+    if (!v || v === 'ALL') return null;
+    if (v.startsWith('TOTAL:')) { const y = v.slice(6); return seasonLogo('Reg. Season ' + y) || seasonLogo('Playoffs ' + y); }
+    return seasonLogo(v);
+  };
+  const img = v => { const b = badge(v); return b ? `<img src="${b}" alt="">` : '<span class="ph"></span>'; };
+  function enhance(sel){
+    if (!sel || sel.dataset.dd) return; sel.dataset.dd = '1';
+    const wrap = document.createElement('div'); wrap.className = 'season-dd';
+    const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'season-dd-btn';
+    const menu = document.createElement('div'); menu.className = 'season-dd-menu';
+    sel.parentNode.insertBefore(wrap, sel); wrap.append(btn, menu, sel); sel.style.display = 'none';
+    const label = opt => { const g = opt.parentElement.tagName === 'OPTGROUP' ? opt.parentElement.label : '';
+      return g ? `<span>${g}</span> · <span>${opt.textContent}</span>` : `<span>${opt.textContent}</span>`; };
+    function draw(){
+      const cur = sel.options[sel.selectedIndex];
+      btn.innerHTML = `${img(sel.value)}<span>${cur ? label(cur) : ''}</span><span class="caret">▾</span>`;
+      let html = '';
+      [...sel.children].forEach(ch => {
+        if (ch.tagName === 'OPTGROUP') {
+          html += `<div class="grp">${ch.label}</div>`;
+          [...ch.children].forEach(o => html += `<button type="button" data-v="${o.value}" class="${o.value === sel.value ? 'on' : ''}">${img(o.value)}<span>${o.textContent}</span></button>`);
+        } else html += `<button type="button" data-v="${ch.value}" class="${ch.value === sel.value ? 'on' : ''}">${img(ch.value)}<span>${ch.textContent}</span></button>`;
+      });
+      menu.innerHTML = html;
+    }
+    btn.addEventListener('click', e => { e.stopPropagation(); document.querySelectorAll('.season-dd.open').forEach(d => d !== wrap && d.classList.remove('open')); wrap.classList.toggle('open'); });
+    menu.addEventListener('click', e => { const b = e.target.closest('button[data-v]'); if (!b) return;
+      sel.value = b.dataset.v; sel.dispatchEvent(new Event('change')); wrap.classList.remove('open'); draw(); });
+    sel.addEventListener('change', draw);
+    draw();
+  }
+  document.addEventListener('click', () => document.querySelectorAll('.season-dd.open').forEach(d => d.classList.remove('open')));
+  ['seasonSelect', 'statsSeasonSelect', 'teamSeasonSelect'].forEach(id => enhance(document.getElementById(id)));
+})();
+
+// ---------------- E5 table: Ziemeļi / Dienvidi switch (opens on our group) ----------------
+(function(){
+  const box = document.getElementById('leagueSwitchBox'); if (!box) return;
+  const show = g => { box.classList.remove('show-Z', 'show-D'); box.classList.add('show-' + g);
+    box.querySelectorAll('.grp-chips button').forEach(b => b.classList.toggle('on', b.dataset.g === g)); };
+  box.querySelector('.grp-chips').addEventListener('click', e => { const b = e.target.closest('button[data-g]'); if (b) show(b.dataset.g); });
+  const ours = () => document.querySelector('#leagueDienvidi tr.ldv-row') ? 'D' : 'Z';
+  show(ours());
+  new MutationObserver(() => show(ours())).observe(document.getElementById('leagueDienvidi'), { childList: true });
+})();
+
+// ---------------- Lineup: one line at a time, hover cards, table for the chosen line ----------------
+(function(){
+  const rink = document.getElementById('lineupRink'), chips = document.getElementById('lineChips');
+  if (!rink || !chips) return;
+  let cur = 0;
+  const slotName = slot => slot.dataset.n || '';
+  function filterTable(names){
+    const tb = document.querySelector('#skaterBoxTable tbody'); if (!tb) return;
+    tb.querySelectorAll('tr.line-total').forEach(r => r.remove());
+    const rows = [...tb.querySelectorAll('tr')].filter(r => r.children.length >= 9);
+    const shown = rows.filter(r => { const ok = names.some(n => r.children[1].textContent.includes(n)); r.style.display = ok ? '' : 'none'; return ok; });
+    tb.querySelectorAll('tr').forEach(r => { if (r.children.length < 9 && r.previousElementSibling && r.previousElementSibling.style.display === 'none') r.style.display = 'none'; });
+    const num = (r, i) => parseFloat(String(r.children[i].textContent).replace('+', '')) || 0;
+    const sum = i => shown.reduce((s, r) => s + num(r, i), 0);
+    const sk = (window.__BOX && window.__BOX.skaters || []).filter(s => names.includes(s.player));
+    const fow = sk.reduce((s, x) => s + (x.fow || 0), 0), fot = sk.reduce((s, x) => s + (x.fot || 0), 0);
+    const pm = sum(8);
+    const tr = document.createElement('tr'); tr.className = 'line-total';
+    tr.innerHTML = `<td></td><td style="text-align:left">Maiņa kopā</td><td></td><td>${sum(3)}</td><td>${sum(4)}</td><td>${sum(5)}</td><td>${sum(6)}</td><td>${sum(7)}</td><td>${pm > 0 ? '+' + pm : pm}</td><td>${fot ? Math.round(fow / fot * 1000) / 10 + '%' : '—'}</td>`;
+    tb.appendChild(tr);
+    const t = document.getElementById('lineTitle'); if (t) t.textContent = chips.children.length ? ` · ${cur + 1}. maiņa` : '';
+  }
+  function apply(){
+    const rows = [...rink.children].filter(r => r.classList.contains('rink-row'));
+    const fwd = rows.filter(r => !r.matches('.def,.gk')), def = rows.filter(r => r.matches('.def')), gk = rows.filter(r => r.matches('.gk'));
+    const n = Math.max(fwd.length, def.length);
+    if (cur >= n) cur = 0;
+    chips.innerHTML = n > 1 ? Array.from({ length: n }, (_, i) => `<button type="button" data-l="${i}" class="${i === cur ? 'on' : ''}">${i + 1}. maiņa</button>`).join('') : '';
+    rows.forEach(r => r.classList.remove('show'));
+    [fwd[cur], def[cur], ...gk].forEach(r => r && r.classList.add('show'));
+    const names = [fwd[cur], def[cur]].filter(Boolean).flatMap(r => [...r.querySelectorAll('.slot')].map(slotName)).filter(Boolean);
+    filterTable(names);
+  }
+  chips.addEventListener('click', e => { const b = e.target.closest('button[data-l]'); if (b) { cur = +b.dataset.l; apply(); } });
+  new MutationObserver(muts => { if (muts.some(m => [...m.addedNodes].some(x => x.classList && x.classList.contains('rink-row')))) apply(); }).observe(rink, { childList: true });
+  apply();
+
+  // hover (or tap) a player on the rink: their stats for this game
+  const pop = document.createElement('div'); pop.className = 'slot-pop'; rink.appendChild(pop);
+  const pct = v => v == null ? '—' : Math.round(v * 1000) / 10 + '%', sgn = v => v > 0 ? '+' + v : String(v ?? 0);
+  function showPop(slot){
+    const name = slot.dataset.n, B = window.__BOX; if (!name || !B) return;
+    const s = B.skaters.find(x => x.player === name), g = B.goalies.find(x => x.player === name);
+    if (!s && !g) return;
+    const photo = DATA.playerPhotos && DATA.playerPhotos[name];
+    const pos = (slot.querySelector('.slot-label') || {}).textContent || '';
+    const head = `<div class="pc-head">${photo ? `<img src="${photo}" alt="">` : ''}<div><div class="pc-name">${name}</div><div class="pc-meta">#${ROSTER_NR[name] ?? ''} · ${pos}</div></div></div>`;
+    let body;
+    if (s) {
+      const sog = s.sh || 0, att = s.shAtt || 0, fow = s.fow || 0, fot = s.fot || 0;
+      body = `<div class="pc-trio"><div><b>${s.g}</b><span>G</span></div><div><b>${s.a}</b><span>A</span></div><div class="hl"><b>${s.g + s.a}</b><span>P</span></div></div>
+        <div class="pc-bar"><div class="t"><span>SOG / Shots</span><span><b>${sog}</b> / ${att} · Shot% <b>${pct(s.shPct)}</b></span></div><div class="track"><div class="fill" style="width:${att ? sog / att * 100 : 0}%"></div></div></div>
+        ${fot ? `<div class="pc-bar"><div class="t"><span>FOW / FOT</span><span><b>${fow}</b> / ${fot} · <b>${pct(s.foPct)}</b></span></div><div class="track"><div class="fill mg" style="width:${fow / fot * 100}%"></div></div></div>` : ''}
+        <div class="pc-all">${[['Shots', att], ['SOG', sog], ['Shot%', pct(s.shPct)], ['BLK', s.bl ?? 0], ['PIM', s.pim ?? 0], ['PIM/A', s.pimA ?? 0],
+          ['+/-', sgn(s.pm), s.pm > 0 ? 'pos' : s.pm < 0 ? 'neg' : ''], ['+/- adj', sgn(s.pmAdj), s.pmAdj > 0 ? 'pos' : s.pmAdj < 0 ? 'neg' : ''],
+          ['FOW/FOT', fot ? fow + '/' + fot : '0/0'], ['FO%', fot ? pct(s.foPct) : '—']]
+          .map(([l, v, c]) => `<div class="${c || ''}"><b>${v}</b><span>${l}</span></div>`).join('')}</div>`;
+    } else {
+      const sv = g.savePct || 0, col = sv >= 91 ? '#4CC98E' : sv >= 85 ? '#E8B24F' : '#E15A5A';
+      body = `<div class="pc-ring"><div class="c" style="background:conic-gradient(${col} ${sv}%, #2A3340 0)"><div>${sv}%</div></div>
+        <div class="k">Atvairīti <b>${g.saves}</b> no <b>${g.shotsFaced}</b> metieniem<br>GA <b>${g.ga}</b></div></div>
+        <div class="pc-all">${[['Shots faced', g.shotsFaced], ['Saves', g.saves], ['GA', g.ga], ['SV%', sv + '%']].map(([l, v]) => `<div><b>${v}</b><span>${l}</span></div>`).join('')}</div>`;
+    }
+    pop.innerHTML = head + `<div class="pc-body">${body}</div>`;
+    pop.style.display = 'block';
+    const r = rink.getBoundingClientRect(), q = slot.getBoundingClientRect();
+    let left = Math.max(4, Math.min(q.left - r.left + q.width / 2 - pop.offsetWidth / 2, r.width - pop.offsetWidth - 4));
+    const lower = (q.top + q.height / 2 - r.top) > r.height * 0.45;
+    pop.style.left = left + 'px';
+    pop.style.top = (lower ? Math.max(4, q.top - r.top - pop.offsetHeight - 8) : q.bottom - r.top + 8) + 'px';
+  }
+  rink.addEventListener('mouseover', e => { const s = e.target.closest('.slot'); if (s) showPop(s); });
+  rink.addEventListener('mouseleave', () => { pop.style.display = 'none'; });
+  rink.addEventListener('mouseout', e => { if (!e.relatedTarget || !e.relatedTarget.closest || !e.relatedTarget.closest('.slot')) pop.style.display = 'none'; });
+})();
+
+// ---------------- Latvian ----------------
+// Everything on the page is translated here in one place, as it is shown. Stat names and
+// abbreviations (G, A, PIM, SOG, Shots on goal, ...) and table column headers stay in English.
+(function(){
+  const EXACT = {
+    'Home':'Sākums', 'Ledus Veči stats':'Ledus Veči statistika', 'Calendar':'Kalendārs',
+    'Overview':'Pārskats', 'Grupa':'Grupa', 'Maiņa kopā':'Maiņa kopā', 'Boxscore':'Protokols', 'Player stats':'Spēlētāju statistika', 'Team stats':'Komandas statistika',
+    'Roster':'Sastāvs', "How it's calculated":'Kā tiek aprēķināts',
+    'HOME':'MĀJĀS', 'AWAY':'IZBRAUKUMĀ', 'LOSS':'ZAUDĒJUMS', 'WIN':'UZVARA', 'Loss':'Zaudējums', 'Win':'Uzvara',
+    'Goals':'Vārti', 'Match statistics':'Spēles statistika', 'Shots & faceoffs by period':'Metieni un iemetieni pa periodiem',
+    'Starting lineup':'Sastāvs', 'Ledus Veči player stats this game':'Statistika',
+    'Player of the game:':'Spēles labākais:', 'Assists:':'Piespēles:', 'Only games with a highlight':'Tikai spēles ar highlight',
+    'Shots on goal':'Metieni vārtos', 'Faceoffs won':'Uzvarētie iemetieni', 'Penalty minutes':'Soda minūtes', 'Icings':'Atmetieni',
+    'Offsides':'Aizspēles', 'Power play':'Vairākumā', 'Penalty kill':'Mazākumā',
+    'EHL profile →':'EHL profils →', 'No games in this range':'Šajā periodā nav spēļu',
+    'Record':'Bilance', 'By period':'Pa periodiem', 'Game log':'Spēles', 'Season totals & averages':'Sezonas kopsummas un vidējie',
+    'Average / game':'Vidēji spēlē', 'Total':'Kopā', 'Average / game':'Vidēji spēlē', 'All seasons':'Visas sezonas', 'Season':'Sezona',
+    'E5 League Table':'E5 turnīra tabula', 'E5 table':'E5 tabula', 'Next game':'Nākamā spēle', 'Full calendar':'Viss kalendārs',
+    'Today':'Šodien', 'Tomorrow':'Rīt', 'Coming up':'Gaidāmie notikumi', 'Last results':'Pēdējie rezultāti', 'Season so far':'Sezona līdz šim',
+    'This week':'Šonedēļ', 'Head-to-head':'Savstarpējās spēles', 'Last meeting':'Pēdējā spēle', 'First meeting':'Pirmā savstarpējā spēle',
+    'Last 5':'Pēdējās 5', 'Games':'Spēles', 'Results':'Aizvadītās spēles', 'Upcoming':'Gaidāmās', 'Player scoring':'Rezultatīvākie spēlētāji',
+    'Goalies':'Vārtsargi', 'Show top 10':'Rādīt top 10', 'Our sponsors':'Mūsu atbalstītāji',
+    'Birthdays':'Dzimšanas dienas', 'Name days':'Vārda dienas', 'Practices':'Treniņi', 'Practice':'Treniņš',
+    'Nothing on this day':'Šajā dienā nekas nav plānots', 'Nothing scheduled yet':'Vēl nekas nav ieplānots',
+    'Nothing on this week':'Šonedēļ nekas nav plānots', 'No games played yet':'Vēl nav aizvadītu spēļu',
+    'No upcoming games in the EHL calendar yet':'Nākamās spēles vēl nav kalendārā',
+    'Birthdays and name days appear after the next data refresh.':'Dzimšanas un vārda dienas parādīsies pēc nākamās datu atjaunošanas.',
+    'Playoffs':'Izslēgšanas spēles', 'Forwards':'Uzbrucēji', 'Defense':'Aizsargi', 'Loading latest data…':'Ielādē jaunākos datus…',
+    'Extra practice':'Papildu treniņš', 'No games yet':'Vēl nav spēļu',
+  };
+  const WD_LONG = { Mon:'Pirmd.', Tue:'Otrd.', Wed:'Trešd.', Thu:'Ceturtd.', Fri:'Piektd.', Sat:'Sestd.', Sun:'Svētd.' };
+  const WD_GRID = { Mon:'P', Tue:'O', Wed:'T', Thu:'C', Fri:'Pk', Sat:'S', Sun:'Sv' };
+  const MON = { Jan:'janv.', Feb:'febr.', Mar:'marts', Apr:'apr.', May:'maijs', Jun:'jūn.', Jul:'jūl.', Aug:'aug.', Sep:'sept.', Oct:'okt.', Nov:'nov.', Dec:'dec.' };
+  const MONTH = { January:'Janvāris', February:'Februāris', March:'Marts', April:'Aprīlis', May:'Maijs', June:'Jūnijs', July:'Jūlijs',
+    August:'Augusts', September:'Septembris', October:'Oktobris', November:'Novembris', December:'Decembris' };
+  const RES = { W:'W', L:'L', D:'D' };   // results stay W / L
+  const MONS = Object.keys(MON).join('|');
+  const RULES = [
+    [new RegExp(`\\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun) (\\d{1,2}) (${MONS})\\b`, 'g'), (m, w, d, mo) => `${WD_LONG[w]}, ${d}. ${MON[mo]}`],
+    [new RegExp(`\\b(\\d{1,2}) (${MONS})\\b`, 'g'), (m, d, mo) => `${d}. ${MON[mo]}`],
+    [/\b(January|February|March|April|May|June|July|August|September|October|November|December) (\d{4})\b/g, (m, mo, y) => `${MONTH[mo]} ${y}`],
+    [/^In (\d+) days$/, (m, n) => `Pēc ${n} dienām`],
+    [/^Today, /, () => 'Šodien, '],
+    [/^(\d+)(?:st|nd|rd|th) in (.+?) · (\d+) pts$/, (m, n, d, p) => `${n}. vieta (${d}) · ${p} p.`],
+    [/^(\d+-\d+) · (\d+)(?:st|nd|rd|th)$/, (m, r, n) => `${r} · ${n}. vieta`],
+    [/^(\d+) games · (\d+) pts in (.+)$/, (m, g, p, d) => `${g} spēles · ${p} p. (${d})`],
+    [/^(\d+) games$/, (m, g) => `${g} spēles`],
+    [/^(\d+)(?:st|nd|rd|th)$/, (m, n) => `${n}.`],
+    [/^at /, () => '@ '],
+    [/Reg\. Season/g, () => 'Regulārā sezona'],
+    [/\bPlayoffs (\d{4}-\d{4})/g, (m, y) => `Izslēgšanas spēles ${y}`],
+    [/^Show all (\d+) players$/, (m, n) => `Rādīt visus ${n} spēlētājus`],
+    [/(\d+) games · latest (\S+) · updated (.+) ago/, (m, n, d, t) => `${n} spēles · pēdējā ${d} · atjaunots pirms ${t}`],
+    [/— updated (.+) ago/, (m, t) => `— atjaunots pirms ${t}`],
+    [/ · LEFT$/, () => ' · kreisais tvēriens'], [/ · RIGHT$/, () => ' · labais tvēriens'],
+    [/^(\d+-\d+) ([WLD])$/, (m, s, r) => `${s} ${RES[r]}`],
+    [/^Assists: /, () => 'Piespēles: '],
+    [/^Practice /, () => 'Treniņš '], [/^Extra practice/, () => 'Papildu treniņš'],
+    [/^Name day: /, () => 'Vārda diena: '], [/^Birthday: /, () => 'Dzimšanas diena: '],
+    [/ \(day of uncommon names\)$/, () => ' (neparasto vārdu diena)'],
+    [/^Season (\d{4}-\d{4})$/, (m, y) => `Sezona ${y}`],
+  ];
+  const SKIP = 'script,style,th,#methodologyView,.record-label,.ov-stat span,.card-stats,.slot-label,.cal-num,td.pn';
+  function tr(node){
+    const el = node.parentElement; if (!el || el.closest(SKIP)) return;
+    const raw = node.nodeValue, t = raw.trim(); if (!t || !/[A-Za-z]/.test(t)) return;
+    let out;
+    if (el.closest('.cal-dow') && WD_GRID[t]) out = WD_GRID[t];
+    else if (EXACT[t]) out = EXACT[t];
+    else if (RES[t] && el.matches('.home-res,.f,.r,.home-form span,.form span')) out = RES[t];
+    else if (WD_LONG[t]) out = WD_LONG[t];
+    else { out = t; RULES.forEach(([re, fn]) => { out = out.replace(re, fn); }); }
+    if (out !== t) node.nodeValue = raw.replace(t, out);
+  }
+  function walk(root){
+    if (root.nodeType === 3) return tr(root);
+    const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT); let n;
+    while ((n = w.nextNode())) tr(n);
+  }
+  walk(document.body);
+  document.title = 'Ledus Veči';
+  new MutationObserver(list => list.forEach(m => {
+    if (m.type === 'characterData') tr(m.target); else m.addedNodes.forEach(walk);
+  })).observe(document.body, { childList: true, subtree: true, characterData: true });
+})();

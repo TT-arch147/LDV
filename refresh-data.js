@@ -190,6 +190,40 @@ function parseLeagueTable(html) {
 }
 
 
+// ---------- E5 team stats (GF, GA, PP%, PK% ... for the E5 table) ----------
+// The league's "Statistika > Komandas" page, regular season, for one division.
+async function fetchTeamStats(previous, divisionId = '400', label = 'E5') {
+  try {
+    let cookie = '';
+    try {
+      const sw = await fetch('https://ehl.entuziasti.com/switch/division/' + divisionId, { headers: BROWSER_HEADERS, redirect: 'manual' });
+      cookie = (sw.headers.get('set-cookie') || '').split(';')[0];
+    } catch (e) { /* the page may still answer for the right division */ }
+    const res = await fetch('https://ehl.entuziasti.com/statistika/komandas?_cb=' + Date.now(),
+      { headers: cookie ? { ...BROWSER_HEADERS, Cookie: cookie } : BROWSER_HEADERS });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const html = await res.text();
+    const table = (html.match(/<table class="team-stats color-columns stat-div-(\d+)">([\s\S]*?)<\/table>/) || []);
+    if (!table[2]) throw new Error('team stats table not found');
+    if (table[1] !== divisionId) throw new Error(`page shows division ${table[1]}, not ${divisionId}`);
+    const num = v => { const n = parseFloat(String(v).replace(',', '.')); return isNaN(n) ? null : n; };
+    const teams = {};
+    for (const row of table[2].matchAll(/<tr>([\s\S]*?)<\/tr>/g)) {
+      const cells = [...row[1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)].map(c => c[1]);
+      if (cells.length < 17) continue;
+      const name = cells[1].replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim();
+      const [gp, w, l, t, otw, otl, pts, gf, ga, pp, pk, s, sa, fow, pim] = cells.slice(2, 17).map(num);
+      teams[name.toUpperCase()] = { gp, w, l, t, otw, otl, pts, gf, ga, pp, pk, s, sa, fow, pim };
+    }
+    if (Object.keys(teams).length < 8) throw new Error('only ' + Object.keys(teams).length + ' teams found');
+    console.log(`team stats ${label}: ${Object.keys(teams).length} teams`);
+    return { teams, fetchedAt: new Date().toISOString() };
+  } catch (err) {
+    console.error(`team stats ${label} failed, keeping previous:`, err.message);
+    return previous || null;
+  }
+}
+
 // ---------- Home page: all three club teams (E5, E7, E9) from the EHL calendar ----------
 // Each team's own calendar view (the same POST the E5 code above uses) lists its played games
 // with scores and protocol links, and its upcoming games. The same view for the next opponent
@@ -328,16 +362,23 @@ async function fetchClubTeams(previous) {
 async function fetchTeamRosters(club, previous) {
   const prev = previous || { people: {}, teams: {} };
   const out = { people: { ...(prev.people || {}) }, teams: { ...(prev.teams || {}) }, fetchedAt: prev.fetchedAt || null };
-  if (prev.fetchedAt && Date.now() - new Date(prev.fetchedAt) < 20 * 3600 * 1000) { console.log('team rosters: fresh (less than a day old), skipped'); return prev; }
+  const complete = ['E5', 'E7', 'E9'].every(d => ((prev.teams || {})[d] || []).length);
+  if (complete && prev.fetchedAt && Date.now() - new Date(prev.fetchedAt) < 20 * 3600 * 1000) { console.log('team rosters: fresh (less than a day old), skipped'); return prev; }
   let list = {};
   try { list = JSON.parse(fs.readFileSync(path.join(__dirname, 'namedays.json'), 'utf8')); } catch (e) {}
   const plainList = {}; Object.entries(list).forEach(([n, d]) => { if (!plainList[plain(n)]) plainList[plain(n)] = d; });
-  for (const div of ['E7', 'E9']) {
+  for (const div of ['E5', 'E7', 'E9']) {   // E5: only to know who is on this season's team (Roster tab)
     const team = club[div];
     if (!team) continue;
     try {
       const html = await getHtml(`${EHL}/komandas/${CLUB_TEAMS.find(t => t.div === div).slug}/${team.id}`);
-      const links = [...new Set([...html.matchAll(/https?:\/\/ehl\.entuziasti\.com\/personas\/[a-z0-9-]+\/(\d+)(?:\/\d+)?/g)].map(m => m[0].replace(/^http:/, 'https:')))];
+      // player links are relative (/personas/name/personId/teamSeasonId). The page also lists other teams'
+      // top scorers in a sidebar, so keep only links with this team's own season id (the most common one).
+      const all = [...html.matchAll(/href="(?:https?:\/\/ehl\.entuziasti\.com)?\/personas\/([a-z0-9-]+)\/(\d+)\/(\d+)"/g)];
+      const cnt = {}; all.forEach(m => cnt[m[3]] = (cnt[m[3]] || 0) + 1);
+      const ownTeam = Object.entries(cnt).sort((x, y) => y[1] - x[1])[0]?.[0];
+      const links = [...new Set(all.filter(m => m[3] === ownTeam).map(m => `${EHL}/personas/${m[1]}/${m[2]}/${m[3]}`))];
+      if (!links.length) console.log(`team roster ${div}: no player links found; sample:`, (html.match(/personas[^"]{0,80}/) || ['(none)'])[0]);
       const ids = [];
       for (const url of links) {
         const pid = url.match(/\/personas\/[a-z0-9-]+\/(\d+)/)[1];
@@ -464,6 +505,9 @@ async function fetchPracticeExtras(previous) {
     try { leagueTables[t.div] = await fetchLeagueTable(leagueTables[t.div], t.divisionId, t.div); }
     catch (err) { console.error(`league table ${t.div}: unexpected error, keeping previous value:`, err.message); }
   }
+  let leagueStats = STATIC.leagueStats;
+  try { leagueStats = await fetchTeamStats(STATIC.leagueStats, '400', 'E5'); }
+  catch (err) { console.error('team stats: unexpected error, keeping previous value:', err.message); }
   let club = STATIC.club, teamRosters = STATIC.teamRosters;
   try { club = await fetchClubTeams(STATIC.club); }
   catch (err) { console.error('club teams: unexpected error, keeping previous value:', err.message); }
@@ -471,7 +515,7 @@ async function fetchPracticeExtras(previous) {
   catch (err) { console.error('team rosters: unexpected error, keeping previous value:', err.message); }
 
   const updated = { ...STATIC, boxscores, skaterRows, goalieRows, roster: finalRoster,
-                     leagueTable, leagueTables, club, teamRosters, upcomingGames, birthdays, nameDays, practiceExtras, lastRefreshed: new Date().toISOString() };
+                     leagueTable, leagueTables, leagueStats, club, teamRosters, upcomingGames, birthdays, nameDays, practiceExtras, lastRefreshed: new Date().toISOString() };
   fs.writeFileSync(file, JSON.stringify(updated) + '\n');
   console.log(`updated static-data.json: ${boxscores.length} games, latest ${boxscores[boxscores.length - 1].date}`);
 })().catch(err => { console.error('refresh failed, static-data.json left unchanged:', err.message); process.exit(1); });
