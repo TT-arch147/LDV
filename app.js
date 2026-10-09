@@ -862,7 +862,8 @@ function oppCell(r){
 function renderStatsTab(){
   (function(){ const ts = document.getElementById('statsTeamSelect'); if (!ts) return; const n = statsPlayerSelect.value;
     ts.innerHTML = teamSelectHtml(n, null, 'E5'); ts.style.display = ts.options.length > 1 ? '' : 'none';
-    document.getElementById('statsView').classList.remove('show-other'); })();
+    if (typeof STATS_TEAM !== 'undefined' && STATS_TEAM !== 'E5' && [...ts.options].some(o => o.value === STATS_TEAM)) { ts.value = STATS_TEAM; showOtherTeam(); }
+    else document.getElementById('statsView').classList.remove('show-other'); })();
   const player = statsPlayerSelect.value;
   const season = statsSeasonSelect.value;
   const isGoalie = ROSTER_POS[player]==='GK' || gkPlayers.includes(player);
@@ -907,7 +908,8 @@ function renderStatsTab(){
   }
 }
 
-statsPlayerSelect.addEventListener('change', ()=>{ statsSortState = {key:'date', dir:-1}; renderStatsTab(); });
+let STATS_TEAM = 'E5';   // team chosen in the Player stats team picker
+statsPlayerSelect.addEventListener('change', ()=>{ STATS_TEAM = 'E5'; statsSortState = {key:'date', dir:-1}; renderStatsTab(); });
 statsSeasonSelect.addEventListener('change', renderStatsTab);
 statsHighlightOnly.addEventListener('change', renderStatsTab);
 
@@ -2030,13 +2032,16 @@ showSection(location.hash.slice(1) || 'home');
 })();
 
 // Player stats: choosing Ledus Veči II / III shows that team's numbers for the same player right here
-document.getElementById('statsTeamSelect') && document.getElementById('statsTeamSelect').addEventListener('change', e => {
-  const sv = document.getElementById('statsView'), box = document.getElementById('statsOtherTeam'), div = e.target.value;
+// The season picker and the highlight filter work here too (for II / III: season by game date, highlights from the protocols)
+function showOtherTeam(){
+  const sv = document.getElementById('statsView'), box = document.getElementById('statsOtherTeam'), div = STATS_TEAM;
   if (div === 'E5') { sv.classList.remove('show-other'); box.innerHTML = ''; return; }
   const v = document.getElementById(div === 'E7' ? 'lv2View' : 'lv3View');
-  box.innerHTML = (v && v._playerView && v._playerView(statsPlayerSelect.value)) || '<div class="empty-note" style="padding:20px 0">Nav datu šai komandai</div>';
+  const opts = { season: statsSeasonSelect.value, hlOnly: statsHighlightOnly.checked };
+  box.innerHTML = (v && v._playerView && v._playerView(statsPlayerSelect.value, opts)) || '<div class="empty-note" style="padding:20px 0">Nav datu šai komandai</div>';
   sv.classList.add('show-other');
-});
+}
+document.getElementById('statsTeamSelect') && document.getElementById('statsTeamSelect').addEventListener('change', e => { STATS_TEAM = e.target.value; showOtherTeam(); });
 
 // ---------------- Ledus Veči II (E7) and III (E9) statistika ----------------
 // Built from EHL data: games and results (team calendar), protocols (goals, assists, penalties, shots, goalie),
@@ -2182,9 +2187,22 @@ document.getElementById('statsTeamSelect') && document.getElementById('statsTeam
     const protoPane = played.length ? `<div class="game-nav" style="padding-left:0;padding-right:0"><select class="cl-game">${gameOpts}</select></div><div class="cl-proto">${protocol(played[played.length - 1].date)}</div>` : '<div class="empty-note">Vēl nav aizvadītu spēļu</div>';
 
     // ---- Spēlētāju statistika ----
-    const playerView = name => {
-      const p = players.find(x => x.name === name); if (!p) return '';
-      const logRows = played.slice().reverse().map(g => { const pr = g.pr; if (!pr || !pr.players.includes(name)) return '';
+    // season value as used by the E5 pickers ("Reg. Season 2026-2027", "Playoffs 2025-2026", "TOTAL:2025-2026", "ALL")
+    const seasonOf = iso => { const [y, m] = iso.split('-').map(Number); return m >= 8 ? `${y}-${y + 1}` : `${y - 1}-${y}`; };
+    const inSeason = (iso, sel) => !sel || sel === 'ALL' || (String(sel).match(/\d{4}-\d{4}/) || [''])[0] === seasonOf(iso);
+    const playerView = (name, opts = {}) => {
+      const p0 = players.find(x => x.name === name); if (!p0) return '';
+      const hasVideo = pr => pr.goals.some(x => x.side === 'us' && x.video && (x.scorer === name || x.a1 === name || x.a2 === name));
+      const gamesFor = played.filter(g => inSeason(g.date, opts.season) && (!opts.hlOnly || (g.pr && hasVideo(g.pr))));
+      let p = p0;
+      if (played.some(g => g.pr)) {   // totals for the chosen season / filter, counted from the protocols
+        const mine = gamesFor.filter(g => g.pr && g.pr.players.includes(name));
+        const G = mine.reduce((s, g) => s + g.pr.goals.filter(x => x.side === 'us' && x.scorer === name).length, 0);
+        const A = mine.reduce((s, g) => s + g.pr.goals.filter(x => x.side === 'us' && (x.a1 === name || x.a2 === name)).length, 0);
+        const PIMp = mine.reduce((s, g) => s + g.pr.penalties.filter(x => x.side === 'us' && x.player === name).reduce((t, x) => t + x.min, 0), 0);
+        p = { ...p0, gp: mine.length, g: G, a: A, p: G + A, pim: PIMp };
+      }
+      const logRows = gamesFor.slice().reverse().map(g => { const pr = g.pr; if (!pr || !pr.players.includes(name)) return '';
         const G = pr.goals.filter(x => x.side === 'us' && x.scorer === name).length, A = pr.goals.filter(x => x.side === 'us' && (x.a1 === name || x.a2 === name)).length;
         const pim = pr.penalties.filter(x => x.side === 'us' && x.player === name).reduce((s, x) => s + x.min, 0);
         return `<tr><td>${dShort(g.date)}</td><td class="name">${g.home ? 'vs' : '@'} ${logoImg(g.logo, g.opp)}${esc(g.opp)}</td><td class="num">${g.us}-${g.them} <span class="r ${g.r}">${g.r}</span></td><td class="num">${G}</td><td class="num">${A}</td><td class="num"><b>${G + A}</b></td><td class="num">${pim}</td></tr>`; }).join('');
