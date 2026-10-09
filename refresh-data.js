@@ -290,12 +290,13 @@ function parseTeamView(html) {
       const ids = [...new Set([...row.matchAll(/\/komandas\/[^"'\/]+\/(\d+)/g)].map(x => x[1]))];
       const score = row.match(/<span class="score">(\d+):(\d+)<\/span>/);
       const prot = (row.match(/\/protokols\/(\d+)/) || [])[1] || null;
+      const imgs = [...row.matchAll(/team_(\d+)\.png/g)].map(x => x[1]);
       games.push({
         date, division: m[1].toUpperCase(),
         time: (row.match(/<td>(\d{1,2}:\d{2})<\/td>/) || [])[1] || null,
         arena: (row.match(/<div class="calendar_arena_block">([^<]+)<\/div>/) || [])[1] || null,
-        home: { abbr: abbrs[0], id: ids.length === 2 ? ids[0] : null },
-        away: { abbr: abbrs[1], id: ids.length === 2 ? ids[1] : null },
+        home: { abbr: abbrs[0], id: ids.length === 2 ? ids[0] : null, img: imgs.length === 2 ? imgs[0] : null },
+        away: { abbr: abbrs[1], id: ids.length === 2 ? ids[1] : null, img: imgs.length === 2 ? imgs[1] : null },
         played: !!score, hg: score ? +score[1] : null, ag: score ? +score[2] : null,
         protocol: prot ? `${EHL}/protokols/${prot}` : null,
       });
@@ -321,6 +322,17 @@ const mostCommonAbbr = games => {
   return Object.entries(n).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
 };
 
+
+// the biggest version of an EHL team logo that exists (the site keeps several sizes)
+const LOGO_CACHE = {};
+async function ehlLogo(img) {
+  if (LOGO_CACHE[img]) return LOGO_CACHE[img];
+  for (const size of ['px150', 'px100', 'px50']) {
+    const url = `${EHL}/uploads/team/${size}/team_${img}.png`;
+    try { const res = await fetch(url, { method: 'HEAD', headers: BROWSER_HEADERS }); if (res.ok) return (LOGO_CACHE[img] = url); } catch (e) {}
+  }
+  return (LOGO_CACHE[img] = `${EHL}/uploads/team/px50/team_${img}.png`);
+}
 async function fetchClubTeams(previous) {
   const prev = previous || {};
   let dir = {};
@@ -346,7 +358,17 @@ async function fetchClubTeams(previous) {
       // names for every team id seen, so the page can show full names instead of abbreviations
       const names = {};
       games.concat(opponent?.games || []).forEach(g => [g.home, g.away].forEach(s => { if (s.id && dir[s.id]) names[s.abbr] = niceName(dir[s.id]); }));
-      out[t.div] = { div: t.div, id, name: t.name, slug: t.slug, abbr, games, opponent, names, fetchedAt: new Date().toISOString() };
+      // logos: a file in the logos folder named after the team wins (logos/kalniesi.png), otherwise the EHL logo
+      const logos = {};
+      const fileSlug = n => plain(n).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      for (const g of games.concat(opponent?.games || [])) for (const s of [g.home, g.away]) {
+        if (logos[s.abbr] || s.abbr === abbr) continue;
+        const nm = names[s.abbr] || (opponent && opponent.abbr === s.abbr ? opponent.name : null);
+        const own = nm && fs.existsSync(path.join(__dirname, 'logos', fileSlug(nm) + '.png')) ? `logos/${fileSlug(nm)}.png` : null;
+        if (own) logos[s.abbr] = own;
+        else if (s.img) logos[s.abbr] = await ehlLogo(s.img);
+      }
+      out[t.div] = { div: t.div, id, name: t.name, slug: t.slug, abbr, games, opponent, names, logos, fetchedAt: new Date().toISOString() };
       console.log(`club ${t.div}: id ${id} (${abbr}), ${games.filter(g => g.played).length} played, ${games.filter(g => !g.played).length} upcoming` +
         (opponent ? `, next opponent ${opponent.name} (${opponent.games.length} results)` : ''));
     } catch (err) {
@@ -405,59 +427,44 @@ async function fetchTeamRosters(club, previous) {
 }
 
 // ---------- Calendar tab data: birthdays, name days, extra practices ----------
-// Extra or cancelled practices: a "Practices" tab in the same Google Sheet, published as CSV.
-// Columns: Datums | Laiks | Halle | Piezīme | Atcelts. Leave this '' until that tab exists.
-const PRACTICES_CSV_URL = '';
+// Extra or cancelled practices: the "Practice" tab of the same Google Sheet. The tab's id (gid) is looked up
+// by its name on the sheet's published page, so nothing has to be pasted here. Columns (row 1):
+// Datums | Laiks | Halle | Piezīme | Atcelts   (Atcelts: "jā" = the regular practice that day is cancelled)
+const PRACTICE_TAB_NAME = 'Practice';
+const PRACTICES_CSV_URL = '';   // optional: a direct published CSV link overrides the lookup
 
-// birth dates from each player's EHL profile ("Dzimšanas dati"). They never change, so only
-// players not looked up yet are fetched - one at a time, to go easy on the EHL site.
-async function fetchBirthdays(roster, previous) {
-  const out = { ...(previous || {}) };
-  const todo = roster.filter(p => p.ehl && !out[p.name]);
-  let added = 0, missed = 0;
-  for (const p of todo) {
-    const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 10000);
-    try {
-      const res = await fetch(p.ehl, { headers: BROWSER_HEADERS, signal: ctl.signal });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const html = await res.text();
-      const m = html.match(/Dzim\S*\s+dati[\s\S]{0,300}?(\d{1,2})\.(\d{1,2})\.(\d{4})/i);
-      if (m) { out[p.name] = `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`; added++; } else missed++;
-    } catch (err) { missed++; }
-    finally { clearTimeout(timer); }
+async function practicesCsvUrl() {
+  if (PRACTICES_CSV_URL) return PRACTICES_CSV_URL;
+  const base = CSV_URLS.data.split('/pub?')[0];   // same published spreadsheet as the game data
+  const html = await (await fetch(base + '/pubhtml?_cb=' + Date.now())).text();
+  const esc = PRACTICE_TAB_NAME.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const m = html.match(new RegExp(`sheet-button-(\\d+)"[^>]*>\\s*<a[^>]*>\\s*${esc}\\s*<`, 'i'))
+    || html.match(new RegExp(`name:\\s*"${esc}"[^}]*?gid:\\s*"(\\d+)"`, 'i'))
+    || html.match(new RegExp(`gid=(\\d+)[^>]*>\\s*${esc}\\s*<`, 'i'));
+  if (!m) {
+    const tabs = [...html.matchAll(/sheet-button-\d+"[^>]*>\s*<a[^>]*>([^<]+)</g)].map(x => x[1].trim());
+    throw new Error(`no published tab named "${PRACTICE_TAB_NAME}" (published tabs: ${tabs.join(', ') || 'none found'}) - check File > Share > Publish to web`);
   }
-  console.log(`birthdays: ${Object.keys(out).length} known, ${added} new, ${missed} not found this run`);
-  return out;
-}
-
-// name days from the official Latvian list (namedays.json, name -> "MM-DD"); names that aren't
-// in it get 22 May, the day for uncommon names
-function buildNameDays(roster) {
-  const list = JSON.parse(fs.readFileSync(path.join(__dirname, 'namedays.json'), 'utf8'));
-  const out = {};
-  for (const p of roster) {
-    const first = p.name.split(' ')[0];
-    out[p.name] = list[first] ? { d: list[first] } : { d: '05-22', special: true };
-  }
-  return out;
+  return `${base}/pub?gid=${m[1]}&single=true&output=csv`;
 }
 
 async function fetchPracticeExtras(previous) {
-  if (!PRACTICES_CSV_URL) return previous || [];
   try {
-    const res = await fetch(PRACTICES_CSV_URL + (PRACTICES_CSV_URL.includes('?') ? '&' : '?') + '_cb=' + Date.now());
+    const url = await practicesCsvUrl();
+    const res = await fetch(url + '&_cb=' + Date.now());
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const text = await res.text();
-    if (!text.includes('Datums')) throw new Error('unexpected response (published link may have changed)');
+    const rows = csvToObjects(text).map(r => { const o = {}; Object.entries(r).forEach(([k, v]) => o[String(k).trim().toLowerCase()] = String(v ?? '').trim()); return o; });
+    const col = (r, ...names) => { for (const n of names) if (r[n] != null && r[n] !== '') return r[n]; return ''; };
     const toIso = v => {
       v = String(v || '').trim();
-      const m = v.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+      const m = v.match(/^(\d{1,2})[./](\d{1,2})[./](\d{4})$/);
       if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
       return /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null;
     };
-    const list = csvToObjects(text).map(r => ({ date: toIso(r['Datums']), time: r['Laiks'] || '', rink: r['Halle'] || '',
-      note: r['Piezīme'] || '', cancelled: /^(j|y|x|atc)/i.test(r['Atcelts'] || '') })).filter(x => x.date);
-    console.log(`practices: ${list.filter(x => !x.cancelled).length} extra, ${list.filter(x => x.cancelled).length} cancelled`);
+    const list = rows.map(r => ({ date: toIso(col(r, 'datums', 'date')), time: col(r, 'laiks', 'time'), rink: col(r, 'halle', 'rink'),
+      note: col(r, 'piezīme', 'piezime', 'note'), cancelled: /^(j|y|x|atc)/i.test(col(r, 'atcelts', 'cancelled')) })).filter(x => x.date);
+    console.log(`practices: ${list.filter(x => !x.cancelled).length} extra, ${list.filter(x => x.cancelled).length} cancelled (from the "${PRACTICE_TAB_NAME}" tab)`);
     return list;
   } catch (err) {
     console.error('practices sheet failed, keeping previous list:', err.message);

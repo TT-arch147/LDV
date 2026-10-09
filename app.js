@@ -1444,7 +1444,7 @@ renderStatsTab();
       if (!g.date || fixed.some(f => f.div === div && f.date === g.date)) return;
       const home = g.home.abbr === t.abbr, o = home ? g.away : g.home, opp = (t.names || {})[o.abbr] || o.abbr;
       const sub = g.played ? `${home ? g.hg : g.ag}-${home ? g.ag : g.hg}` : [g.time, g.arena ? titleCase(g.arena) : ''].filter(Boolean).join(' · ');
-      fixed.push({ date: g.date, type: 'game', div, ha: home ? 'vs' : '@', opp, sub, short: `${home ? 'vs' : 'at'} ${opp}`, text: `${div} · ${home ? 'vs' : 'at'} ${opp}${sub ? ' · ' + sub : ''}` });
+      fixed.push({ date: g.date, type: 'game', div, ha: home ? 'vs' : '@', opp, logo: (t.logos || {})[o.abbr] || null, sub, short: `${home ? 'vs' : 'at'} ${opp}`, text: `${div} · ${home ? 'vs' : 'at'} ${opp}${sub ? ' · ' + sub : ''}` });
     });
   });
   const extras = DATA.practiceExtras || [];
@@ -1488,13 +1488,14 @@ renderStatsTab();
   // birthdays and name days as plain "Name (type)"
   const OPP_LOGO_ALIAS = { 'Warriors':'Ice Warriors', 'Ice Wolves II':'Ice Wolves', 'Iecava/Mammoths':'Mammoths', 'Leģendas V':'Pilsētas Leģendas', 'Sparta II':'Sparta 2', 'Moltto Plus':'Moltto' };
   const WHISTLE = '<svg class="ce-ic" viewBox="0 0 1200 1100" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="56" stroke-linecap="round" stroke-linejoin="round"><path d="M70 383 H527 V550 L622 383 H757 A300 300 0 0 1 757 983 A300 300 0 0 1 490 830 C440 740 350 660 240 637 C205 629 185 625 157 625 C135 625 120 640 105 660 C90 676 75 672 64 672 C42 672 22 652 22 625 L24 430 C24 405 45 383 70 383 Z"/><path d="M120 503 V630"/><circle cx="1115" cy="685" r="60"/><path d="M623 240 L672 118 M718 265 L937 45"/></svg>';
-  function oppLogo(name){
+  function oppLogo(name, url){
+    if (url) return `<img class="ce-logo" src="${url}" alt="" title="${esc(name)}">`;
     const k = OPP_LOGO_ALIAS[name] || name, info = DATA.teamAssets && DATA.teamAssets[k];
     if (info && info.logo) return `<img class="ce-logo" src="${teamLogo(k)}" alt="" title="${esc(name)}">`;
     return `<span class="ce-ini" title="${esc(name)}">${esc(String(name).split(/\s+/).map(w => w[0]).join('').slice(0, 3).toUpperCase())}</span>`;
   }
   function cellItem(e, solo){
-    if (e.type === 'game') return `<span class="ce ce-g d-${e.div}${solo ? ' solo' : ''}" title="${esc(e.text)}"><span class="ce-top"><span class="ha">${e.ha}</span>${oppLogo(e.opp)}</span>${e.sub ? `<span class="ce-sub">${esc(e.sub)}</span>` : ''}</span>`;
+    if (e.type === 'game') return `<span class="ce ce-g d-${e.div}${solo ? ' solo' : ''}" title="${esc(e.text)}"><span class="ce-top"><span class="ha">${e.ha}</span>${oppLogo(e.opp, e.logo)}</span>${e.sub ? `<span class="ce-sub">${esc(e.sub)}</span>` : ''}</span>`;
     if (e.type === 'practice') return `<span class="ce ce-p${solo ? ' solo' : ''}" title="${esc(e.text)}"><span class="ce-top">${WHISTLE}</span>${e.sub ? `<span class="ce-sub">${esc(e.sub)}</span>` : ''}</span>`;
     const icon = e.type === 'bday'
       ? '<svg class="ce-pi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16M5 20v-7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v7M5 15c1.5 1 3 1 4.5 0s3-1 4.5 0 3 1 5 0M12 11V8M12 5.5c.8-.9.8-1.7 0-2.5-.8.8-.8 1.6 0 2.5z"/></svg>'
@@ -1728,7 +1729,7 @@ renderStatsTab();
     const oppAbbr = nx ? ehlPersp(nx, t.abbr, names).oppAbbr : null;
     return { div, name: t.name, logo: ldvLogo, played, season: played, next,
       h2h: played.filter(p => p.oppAbbr === oppAbbr), h2hLink: false,
-      oppPlayed: oppGames(t.opponent, t), oppLogo: null, ehlUpcoming: games.filter(g => !g.played) };
+      oppPlayed: oppGames(t.opponent, t), oppLogo: oppAbbr && t.logos ? t.logos[oppAbbr] || null : null, ehlUpcoming: games.filter(g => !g.played) };
   }
 
   // ---- this week (Mon-Sun): games, the shared practice, players' birthdays and name days ----
