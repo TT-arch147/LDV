@@ -361,7 +361,7 @@ function parseProtocol(html, url, ourClubId) {
     home: { abbr: abbrs[0], id: sideIds[0], name: fixCase((pl[0] || '').split(' vs ')[0]) },
     away: { abbr: abbrs[1], id: sideIds[1], name: fixCase((pl[0] || '').split(' vs ')[1]) },
     played: !!(sa && sb), hg: sa ? +sa[1] : null, ag: sb ? +sb[1] : null,
-    video: (html.match(/href="(https:\/\/www\.youtube\.com\/embed\/[^"]+)"[^>]*class="video"/) || [])[1] || null,
+    video: (html.match(/<a href="(https:\/\/www\.youtube\.com\/embed\/[^"]+)"[^>]*>\s*SPĒLES VIDEO/i) || [])[1] || null,
     shots: { us: weHome ? num('stats_sog_a') : num('stats_sog_b'), them: weHome ? num('stats_sog_b') : num('stats_sog_a') },
     faceoffs: { us: weHome ? num('stats_foff_a') : num('stats_foff_b'), them: weHome ? num('stats_foff_b') : num('stats_foff_a') },
     goals: [], penalties: [], goalies: [], players: [] };
@@ -385,6 +385,13 @@ function parseProtocol(html, url, ourClubId) {
       }
     }
   }
+  // overtime / shootout
+  const titles = [...html.matchAll(/<span class="title">([^<]+)<\/span>/g)].map(m => m[1].trim());
+  const pdata = strip((html.match(/id="periodData">([\s\S]*?)<\/div>\s*<div class="score/) || [])[1] || '');
+  const so = titles.some(x => /metien|bull|shoot|\bSO\b/i.test(x)) || /\bSO\b|metien/i.test(pdata);
+  const ot = !so && (titles.some(x => /papild|\bOT\b/i.test(x)) || /\bOT\b|papild/i.test(pdata) || g.goals.some(x => x.period >= 4));
+  g.decided = so ? 'SO' : ot ? 'OT' : '';
+  g.v = 2;   // reader version: older copies (wrong video link, no OT/SO) get read again once
   // our players' stats table (number, position, G, A, P, PIM)
   for (const tb of html.matchAll(/<table class="protocol-stats"><thead><tr><th[^>]*>#<\/th><th class="img-inlcuded"><a href="\/komandas\/[^"\/]+\/(\d+)"[\s\S]*?<tbody>([\s\S]*?)<\/tbody>/g)) {
     if (tb[1] !== String(ourClubId)) continue;
@@ -775,7 +782,7 @@ async function fetchPracticeExtras(previous) {
       let read = 0;
       for (const url of urls) {
         const old = known[url];
-        if (old && old.played && old.date < weekAgo) continue;          // finished and settled
+        if (old && old.v === 2 && old.played && old.date < weekAgo) continue;   // finished, settled, read with the current reader
         if (old && !old.played && old.date > todayIso) continue;        // still in the future
         try { const gm = parseProtocol(await getHtml(url), url, OUR_CLUB[div]); if (gm) { known[url] = gm; read++; } } catch (e) { /* keep the old copy */ }
       }
