@@ -512,6 +512,19 @@ async function fetchPracticeExtras(previous) {
     try { leagueTables[t.div] = await fetchLeagueTable(leagueTables[t.div], t.divisionId, t.div); }
     catch (err) { console.error(`league table ${t.div}: unexpected error, keeping previous value:`, err.message); }
   }
+  // E5 upcoming games: the team calendar read for the home page (club.E5) has the whole schedule, while the older
+  // E5 reader often falls back to the site's header strip, which only shows the next few days. Use the full one.
+  const fromClub = (c) => {
+    const e5 = c && c.E5; if (!e5 || !e5.games) return null;
+    const MON = ['Janvāris','Februāris','Marts','Aprīlis','Maijs','Jūnijs','Jūlijs','Augusts','Septembris','Oktobris','Novembris','Decembris'];
+    const WD = ['Svētdiena','Pirmdiena','Otrdiena','Trešdiena','Ceturtdiena','Piektdiena','Sestdiena'];
+    const today = new Date().toISOString().slice(0, 10);
+    const fut = e5.games.filter(g => !g.played && g.date && g.date >= today).sort((a, b) => a.date < b.date ? -1 : 1);
+    if (!fut.length) return null;
+    return fut.map(g => { const [y, m, d] = g.date.split('-').map(Number), home = g.home.abbr === e5.abbr, o = home ? g.away : g.home;
+      return { date: `${d}. ${MON[m - 1]}`, weekday: WD[new Date(y, m - 1, d).getDay()], time: g.time || '', arena: g.arena || '',
+        opponent: TEAM_ABBR[o.abbr] || (e5.names || {})[o.abbr] || o.abbr, isHome: home, protocol: g.protocol || null, fetchedAt: new Date().toISOString() }; });
+  };
   let leagueStats = STATIC.leagueStats;
   try { leagueStats = await fetchTeamStats(STATIC.leagueStats, '400', 'E5'); }
   catch (err) { console.error('team stats: unexpected error, keeping previous value:', err.message); }
@@ -520,6 +533,8 @@ async function fetchPracticeExtras(previous) {
   catch (err) { console.error('club teams: unexpected error, keeping previous value:', err.message); }
   try { teamRosters = await fetchTeamRosters(club || {}, STATIC.teamRosters); }
   catch (err) { console.error('team rosters: unexpected error, keeping previous value:', err.message); }
+  const fullE5 = fromClub(club);
+  if (fullE5) { upcomingGames = fullE5; console.log(`upcoming E5: ${fullE5.length} games from the team calendar`); }
 
   const updated = { ...STATIC, boxscores, skaterRows, goalieRows, roster: finalRoster,
                      leagueTable, leagueTables, leagueStats, club, teamRosters, upcomingGames, birthdays, nameDays, practiceExtras, lastRefreshed: new Date().toISOString() };

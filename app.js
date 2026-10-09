@@ -1,5 +1,7 @@
 
 const DATA = window.__LIVE_DATA;
+// keep only the clock time (the EHL ribbon sometimes gives "sestdiena: 19:30")
+(DATA.upcomingGames || []).forEach(g => { const m = String(g.time || '').match(/\d{1,2}:\d{2}/); if (m) g.time = m[0]; });
 const LV_COLOR = (DATA.teamAssets['Ledus Veči'] && DATA.teamAssets['Ledus Veči'].accent) || '#830C67';
 const DEFAULT_LOGO = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="none" stroke="%237C8A93" stroke-width="1.5"/></svg>');
 

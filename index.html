@@ -2,7 +2,17 @@
 <html lang="lv">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" id="vp" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<script>
+  // Phones and small tablets: show the same desktop design, scaled down to fit the screen
+  // (instead of the stacked mobile layout). Pinch-zoom still works.
+  (function(){
+    var DESIGN_WIDTH = 1280;
+    if (window.innerWidth < DESIGN_WIDTH && Math.min(screen.width, window.outerWidth || screen.width) < DESIGN_WIDTH) {
+      document.getElementById('vp').setAttribute('content', 'width=' + DESIGN_WIDTH + ', viewport-fit=cover');
+    }
+  })();
+</script>
 <title>Ledus Veči Spēļu protokols</title>
 <link rel="icon" type="image/png" href="logos/ledus-veci.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
