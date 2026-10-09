@@ -749,8 +749,8 @@ async function fetchPracticeExtras(previous) {
   let leagueStats = STATIC.leagueStats;
   try { leagueStats = await fetchTeamStats(STATIC.leagueStats, '400', 'E5'); }
   catch (err) { console.error('team stats: unexpected error, keeping previous value:', err.message); }
-  await downloadTeamLogos('402', 'E7');
-  await downloadTeamLogos('404', 'E9');
+  // (automatic EHL logo downloads are off: the workflow doesn't save new files in the logos folder,
+  //  so those copies never reached the site. Logos come from the files you upload to the folder.)
   let club = STATIC.club, teamRosters = STATIC.teamRosters;
   try { club = await fetchClubTeams(STATIC.club); }
   catch (err) { console.error('club teams: unexpected error, keeping previous value:', err.message); }
@@ -808,7 +808,7 @@ async function fetchPracticeExtras(previous) {
   try {
     const keyOf = n => plain(n).replace(/[^a-z0-9]+/g, '');
     fs.readdirSync(path.join(__dirname, 'logos')).filter(f => /\.(png|jpe?g|webp|svg)$/i.test(f))
-      .forEach(f => { logoFiles[keyOf(f.replace(/\.[^.]+$/, ''))] = 'logos/' + encodeURIComponent(f); });
+      .forEach(f => { const k = keyOf(f.replace(/\.[^.]+$/, '')); if (!logoFiles[k]) logoFiles[k] = 'logos/' + encodeURIComponent(f); });
     console.log(`logo files: ${Object.keys(logoFiles).length}`);
   } catch (err) { console.error('logo files:', err.message); }
   let pageSamples = STATIC.pageSamples;
