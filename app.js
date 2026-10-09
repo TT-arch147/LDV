@@ -1953,6 +1953,40 @@ showSection(location.hash.slice(1) || 'home');
   rink.addEventListener('mouseout', e => { if (!e.relatedTarget || !e.relatedTarget.closest || !e.relatedTarget.closest('.slot')) pop.style.display = 'none'; });
 })();
 
+// ---------------- E5 table: click a column header to sort ----------------
+// 1st click: highest first (lowest first for GA), 2nd click: the other way, 3rd click: back to the standings.
+(function(){
+  const box = document.getElementById('leagueSwitchBox'); if (!box) return;
+  const LOW_FIRST = { GA: true, Team: true };
+  let key = null, dir = 0;   // dir: 1 = natural (high first), -1 = reversed
+  const val = (td, k) => k === 'Team' ? td.textContent.trim().toLowerCase() : (parseFloat(td.textContent.replace('%', '')) || (td.textContent.trim() === '—' ? -Infinity : 0));
+  function apply(){
+    box.classList.toggle('sorted', !!key);
+    box.querySelectorAll('table.league-table').forEach(t => {
+      const heads = [...t.querySelectorAll('thead th')], tb = t.querySelector('tbody');
+      heads.forEach(h => { h.dataset.k = h.dataset.k || h.textContent.trim(); h.classList.toggle('sort-on', h.dataset.k === key);
+        h.dataset.arrow = h.dataset.k === key ? (((dir === 1) !== !!LOW_FIRST[key]) ? '▼' : '▲') : ''; });
+      const rows = [...tb.querySelectorAll('tr')];
+      rows.forEach((r, i) => { if (r.dataset.rank === undefined) r.dataset.rank = i; });
+      const ci = heads.findIndex(h => h.dataset.k === key);
+      rows.sort((a, b) => {
+        if (!key || ci < 0) return a.dataset.rank - b.dataset.rank;
+        const va = val(a.children[ci], key), vb = val(b.children[ci], key);
+        let c = typeof va === 'string' ? va.localeCompare(vb) : (vb - va);
+        if (LOW_FIRST[key]) c = -c;
+        return (c * dir) || (a.dataset.rank - b.dataset.rank);
+      }).forEach(r => tb.appendChild(r));
+    });
+  }
+  box.addEventListener('click', e => {
+    const th = e.target.closest('table.league-table thead th'); if (!th) return;
+    const k = th.dataset.k || th.textContent.trim();
+    if (key !== k) { key = k; dir = 1; } else if (dir === 1) dir = -1; else { key = null; dir = 0; }
+    apply();
+  });
+  apply();
+})();
+
 // ---------------- Latvian ----------------
 // Everything on the page is translated here in one place, as it is shown. Stat names and
 // abbreviations (G, A, PIM, SOG, Shots on goal, ...) and table column headers stay in English.
