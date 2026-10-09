@@ -802,13 +802,22 @@ async function fetchPracticeExtras(previous) {
       console.log(`protocols ${div}: ${read} read this run, ${clubGames[div].length} games, ${clubPlayers[div].length} players`);
     } catch (err) { console.error(`protocols ${div} failed, keeping previous:`, err.message); }
   }
+  // every logo in the logos folder, by a simplified name (no accents, case, spaces or punctuation), so a file
+  // like "APARĀTI.png" or "ICE WOLVES_CLUBZONE.LV.png" is found for "Aparāti" / "Ice Wolves / Clubzone.lv"
+  const logoFiles = {};
+  try {
+    const keyOf = n => plain(n).replace(/[^a-z0-9]+/g, '');
+    fs.readdirSync(path.join(__dirname, 'logos')).filter(f => /\.(png|jpe?g|webp|svg)$/i.test(f))
+      .forEach(f => { logoFiles[keyOf(f.replace(/\.[^.]+$/, ''))] = 'logos/' + encodeURIComponent(f); });
+    console.log(`logo files: ${Object.keys(logoFiles).length}`);
+  } catch (err) { console.error('logo files:', err.message); }
   let pageSamples = STATIC.pageSamples;
   try { pageSamples = await capturePageSamples(club); } catch (err) { console.error('page samples failed:', err.message); }
   const fullE5 = fromClub(club);
   if (fullE5) { upcomingGames = fullE5; console.log(`upcoming E5: ${fullE5.length} games from the team calendar`); }
 
   const updated = { ...STATIC, boxscores, skaterRows, goalieRows, roster: finalRoster,
-                     leagueTable, leagueTables, leagueStats, clubTeamStats, clubGames, clubPlayers, club, pageSamples, runLog: RUN_LOG.slice(-400), teamRosters, upcomingGames, birthdays, nameDays, practiceExtras, lastRefreshed: new Date().toISOString() };
+                     leagueTable, leagueTables, leagueStats, clubTeamStats, clubGames, clubPlayers, logoFiles, club, pageSamples, runLog: RUN_LOG.slice(-400), teamRosters, upcomingGames, birthdays, nameDays, practiceExtras, lastRefreshed: new Date().toISOString() };
   fs.writeFileSync(file, JSON.stringify(updated) + '\n');
   console.log(`updated static-data.json: ${boxscores.length} games, latest ${boxscores[boxscores.length - 1].date}`);
 })().catch(err => { console.error('refresh failed, static-data.json left unchanged:', err.message); process.exit(1); });

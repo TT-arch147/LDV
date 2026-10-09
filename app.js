@@ -2076,10 +2076,12 @@ document.getElementById('statsTeamSelect') && document.getElementById('statsTeam
     const div = view.dataset.div, t = DATA.club && DATA.club[div];
     if (!t || !t.games) { view.innerHTML = '<div class="wrap"><div class="empty-note" style="padding:30px 0">Dati vēl nav ielādēti.</div></div>'; return; }
     const names = t.names || {}, logos = t.logos || {};
+    const logoKey = n => String(n || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+    const fileLogo = n => (DATA.logoFiles || {})[logoKey(n)] || null;
     const prot = {}; ((DATA.clubGames && DATA.clubGames[div]) || []).forEach(p => prot[p.date] = p);
     const games = t.games.filter(g => g.date).sort((x, y) => x.date < y.date ? -1 : 1).map(g => {
       const home = g.home.abbr === t.abbr, o = home ? g.away : g.home, pr = prot[g.date] || null;
-      return { date: g.date, home, opp: names[o.abbr] || o.abbr, logo: logos[o.abbr] || null, played: g.played,
+      return { date: g.date, home, opp: names[o.abbr] || o.abbr, logo: logos[o.abbr] || fileLogo(names[o.abbr] || o.abbr), played: g.played,
         us: home ? g.hg : g.ag, them: home ? g.ag : g.hg, r: g.played ? res(home ? g.hg : g.ag, home ? g.ag : g.hg) : null,
         time: g.time, arena: g.arena ? nice(g.arena) : '', link: g.protocol, pr,
         s: pr ? pr.shots.us : null, sa: pr ? pr.shots.them : null,
@@ -2147,7 +2149,7 @@ document.getElementById('statsTeamSelect') && document.getElementById('statsTeam
       .slice(0, 2).forEach(x => wildcards.add(up(x.team)));
     const tableRows = (teams, offset) => teams.map((x, i) => { const n = offset + i + 1, wc = wildcards.has(up(x.team));
       const cut = grouped ? (n === 2 ? 'cut-po' : '') : (n === 4 ? 'cut-po' : n === 12 ? 'cut-pi' : '');
-      return `<tr class="${[up(x.team) === up(t.name) ? 'me' : '', cut, wc ? 'wc' : ''].join(' ')}"><td>${n}</td><td class="name">${esc(nice(x.team))}${wc ? ' <span class="wc-badge">WC</span>' : ''}</td><td class="num">${x.gp ?? ''}</td><td class="num"><b>${x.points ?? ''}</b></td></tr>`; }).join('');
+      return `<tr class="${[up(x.team) === up(t.name) ? 'me' : '', cut, wc ? 'wc' : ''].join(' ')}"><td>${n}</td><td class="name">${up(x.team) === up(t.name) ? `<img class="tlogo" src="${teamLogo('Ledus Veči')}" alt="">` : (fileLogo(x.team) ? `<img class="tlogo" src="${fileLogo(x.team)}" alt="">` : '')}${esc(nice(x.team))}${wc ? ' <span class="wc-badge">WC</span>' : ''}</td><td class="num">${x.gp ?? ''}</td><td class="num"><b>${x.points ?? ''}</b></td></tr>`; }).join('');
     const tableOf = (teams, offset) => `<table class="ovt"><tr><th>#</th><th>Team</th><th class="num">GP</th><th class="num">PTS</th></tr>${tableRows(teams, offset)}</table>`;
     const legend = grouped ? '<div class="tbl-legend"><span class="po"></span>1.-2. izslēgšanas spēles <i class="wc-badge">WC</i> wildcard (2 labākie no pārējām komandām)</div>'
       : '<div class="tbl-legend"><span class="po"></span>1.-4. izslēgšanas spēles <span class="pi"></span>5.-12. play-in</div>';
