@@ -1365,7 +1365,7 @@ if (DATA.leagueTable && DATA.leagueTable.divisions) {
 if (DATA.upcomingGames && DATA.upcomingGames.length) {
   const CAL_LOGO_ALIAS = { 'Warriors': 'Ice Warriors', 'Ice Wolves II': 'Ice Wolves',
     'Iecava/Mammoths': 'Mammoths', 'Leģendas V': 'Pilsētas Leģendas', 'Sparta II': 'Sparta 2', 'Moltto Plus': 'Moltto' };
-  document.getElementById('calendarBody').innerHTML = DATA.upcomingGames.slice(0, 1).map(g => {
+  document.getElementById('calendarBody').innerHTML = DATA.upcomingGames.slice(0, 6).map(g => {
     const logoObj = DATA.teamAssets && DATA.teamAssets[CAL_LOGO_ALIAS[g.opponent] || g.opponent];
     const logo = logoObj && logoObj.logo;
     const oppCell = logo ? `<img class="league-logo" src="${logo}" alt="">${g.opponent}` : g.opponent;
@@ -1380,7 +1380,7 @@ if (DATA.upcomingGames && DATA.upcomingGames.length) {
     const arena = g.arena ? String(g.arena).toLowerCase().replace(/(^|[\s/-])\S/g, c => c.toUpperCase()) : '';
     return `
     <div class="calendar-row">
-      <div class="calendar-opp"><span class="vs">${g.isHome ? 'vs' : 'at'}</span>${oppCell}</div>
+      <div class="calendar-opp"><span class="vs">${g.isHome ? 'vs' : '@'}</span>${oppCell}</div>
       <div class="calendar-when">${when}${when ? ' · ' : ''}${g.time || ''}${arena ? ' · ' + arena : ''}</div>
     </div>`;
   }).join('');
@@ -2011,7 +2011,7 @@ showSection(location.hash.slice(1) || 'home');
     'EHL profile →':'EHL profils →', 'No games in this range':'Šajā periodā nav spēļu',
     'Record':'Bilance', 'By period':'Pa periodiem', 'Game log':'Spēles', 'Season totals & averages':'Sezonas kopsummas un vidējie',
     'Average / game':'Vidēji spēlē', 'Total':'Kopā', 'Average / game':'Vidēji spēlē', 'All seasons':'Visas sezonas', 'Season':'Sezona',
-    'E5 League Table':'E5 turnīra tabula', 'E5 table':'E5 tabula', 'Next game':'Nākamā spēle', 'Full calendar':'Viss kalendārs',
+    'E5 League Table':'E5 turnīra tabula', 'E5 table':'E5 tabula', 'Next game':'Nākamā spēle', 'Next games':'Nākamās spēles', 'Full calendar':'Viss kalendārs',
     'Today':'Šodien', 'Tomorrow':'Rīt', 'Coming up':'Gaidāmie notikumi', 'Last results':'Pēdējie rezultāti', 'Season so far':'Sezona līdz šim',
     'This week':'Šonedēļ', 'Head-to-head':'Savstarpējās spēles', 'Last meeting':'Pēdējā spēle', 'First meeting':'Pirmā savstarpējā spēle',
     'Last 5':'Pēdējās 5', 'Games':'Spēles', 'Results':'Aizvadītās spēles', 'Upcoming':'Gaidāmās', 'Player scoring':'Rezultatīvākie spēlētāji',
