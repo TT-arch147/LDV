@@ -822,6 +822,33 @@ function renderRadarChart(player, season, isGoalie){
   });
 }
 
+
+// ---------------- one player, several teams ----------------
+// A player can play for Ledus Veči (E5), II (E7) and III (E9). Teams are matched by EHL person id, then by name.
+const TEAM_LABEL = { E5: 'Ledus Veči', E7: 'Ledus Veči II', E9: 'Ledus Veči III' };
+const personIdOf = url => ((String(url || '').match(/\/personas\/[a-z0-9-]+\/(\d+)/) || [])[1]) || null;
+function playerTeams(name, ehl){
+  const id = personIdOf(ehl || (ROSTER_BY_NAME[name] && ROSTER_BY_NAME[name].ehl)), out = [];
+  const inE5 = DATA.skaterRows.some(r => r.player === name) || (DATA.goalieRows || []).some(r => r.player === name) || !!ROSTER_BY_NAME[name];
+  if (inE5) out.push('E5');
+  ['E7', 'E9'].forEach(div => {
+    const R = DATA.teamRosters || {}, ids = (R.teams && R.teams[div]) || [];
+    const inRoster = ids.some(pid => { const pp = R.people && R.people[pid]; return pp && ((id && personIdOf(pp.ehl) === id) || pp.name === name); });
+    const inStats = ((DATA.clubPlayers && DATA.clubPlayers[div]) || []).some(p => p.name === name || (id && personIdOf(p.ehl) === id));
+    if (inRoster || inStats) out.push(div);
+  });
+  return out;
+}
+function openPlayerInTeam(div, name){
+  if (div === 'E5') { location.hash = 'stats'; goToPlayerStats(name); return; }
+  const view = document.getElementById(div === 'E7' ? 'lv2View' : 'lv3View'); if (!view) return;
+  location.hash = div === 'E7' ? 'lv2' : 'lv3';
+  if (view._openPlayer) view._openPlayer(name);
+  window.scrollTo(0, 0);
+}
+const teamSelectHtml = (name, ehl, current) => { let teams = playerTeams(name, ehl); if (current !== 'E5') teams = teams.filter(d => d !== 'E5'); if (!teams.includes(current)) teams.unshift(current);
+  return teams.map(d => `<option value="${d}"${d === current ? ' selected' : ''}>${TEAM_LABEL[d]} (${d})</option>`).join(''); };
+
 // opponent cell for the player game log: "vs" (home) or "@" (away), plus the team logo
 const GAME_HOME = {}; DATA.boxscores.forEach(b => { GAME_HOME[b.date] = b.lvIsHome; });
 const OPP_ALIAS = { 'Warriors':'Ice Warriors', 'Ice Wolves II':'Ice Wolves', 'Iecava/Mammoths':'Mammoths', 'Leģendas V':'Pilsētas Leģendas', 'Sparta II':'Sparta 2', 'Moltto Plus':'Moltto' };
@@ -833,6 +860,9 @@ function oppCell(r){
 }
 
 function renderStatsTab(){
+  (function(){ const ts = document.getElementById('statsTeamSelect'); if (!ts) return; const n = statsPlayerSelect.value;
+    ts.innerHTML = teamSelectHtml(n, null, 'E5'); ts.style.display = ts.options.length > 1 ? '' : 'none';
+    document.getElementById('statsView').classList.remove('show-other'); })();
   const player = statsPlayerSelect.value;
   const season = statsSeasonSelect.value;
   const isGoalie = ROSTER_POS[player]==='GK' || gkPlayers.includes(player);
@@ -1999,6 +2029,15 @@ showSection(location.hash.slice(1) || 'home');
   apply();
 })();
 
+// Player stats: choosing Ledus Veči II / III shows that team's numbers for the same player right here
+document.getElementById('statsTeamSelect') && document.getElementById('statsTeamSelect').addEventListener('change', e => {
+  const sv = document.getElementById('statsView'), box = document.getElementById('statsOtherTeam'), div = e.target.value;
+  if (div === 'E5') { sv.classList.remove('show-other'); box.innerHTML = ''; return; }
+  const v = document.getElementById(div === 'E7' ? 'lv2View' : 'lv3View');
+  box.innerHTML = (v && v._playerView && v._playerView(statsPlayerSelect.value)) || '<div class="empty-note" style="padding:20px 0">Nav datu šai komandai</div>';
+  sv.classList.add('show-other');
+});
+
 // ---------------- Ledus Veči II (E7) and III (E9) statistika ----------------
 // Built from EHL data: games and results (team calendar), protocols (goals, assists, penalties, shots, goalie),
 // division table, roster. Highlight links come from the "Highlights" sheet tab. Same look as the Ledus Veči pages.
@@ -2043,7 +2082,11 @@ showSection(location.hash.slice(1) || 'home');
         pimA: pr ? pr.penalties.filter(x => x.side === 'them').reduce((s, x) => s + x.min, 0) : null }; });
     const played = games.filter(g => g.played), upcoming = games.filter(g => !g.played && g.date >= today);
     const W = played.filter(g => g.r === 'W').length, L = played.filter(g => g.r === 'L').length, D = played.filter(g => g.r === 'D').length;
-    const sum = k => played.reduce((s, g) => s + (g[k] || 0), 0), GF = sum('us'), GA = sum('them'), S = sum('s'), SA = sum('sa'), PIM = sum('pim'), PIMA = sum('pimA');
+    const sum = k => played.reduce((s, g) => s + (g[k] || 0), 0), GF = sum('us'), GA = sum('them');
+    // shots and penalty minutes: from the protocols, or from the EHL team stats page until protocols are read
+    const ts = ((DATA.clubTeamStats && DATA.clubTeamStats[div] && DATA.clubTeamStats[div].teams) || {})[up(t.name)] || {};
+    const hasProt = played.some(g => g.pr);
+    const S = hasProt ? sum('s') : (ts.s ?? 0), SA = hasProt ? sum('sa') : (ts.sa ?? 0), PIM = hasProt ? sum('pim') : (ts.pim ?? 0), PIMA = hasProt ? sum('pimA') : 0;
     const gp = played.length || 1;
     const divs = (DATA.leagueTables && DATA.leagueTables[div] && DATA.leagueTables[div].divisions) || [];
     const ourDiv = Math.max(0, divs.findIndex(d => d.teams.some(x => up(x.team) === up(t.name))));
@@ -2053,8 +2096,15 @@ showSection(location.hash.slice(1) || 'home');
     const Rr = DATA.teamRosters || {};
     const players = (fromProt || ((Rr.teams && Rr.teams[div]) || []).map(id => Rr.people && Rr.people[id]).filter(Boolean)
         .map(pp => ({ name: pp.name, ehl: pp.ehl, pos: pp.pos || null, nr: pp.nr ?? null, gp: null, g: null, a: null, pim: null })))
-      .map(p => ({ ...p, p: p.g == null ? null : p.g + p.a }));
+      .map(p => ({ ...p, p: p.g == null ? null : p.g + p.a }))
+      .map(p => { // copy what the E5 roster sheet already knows about this player
+        const e5 = ROSTER_BY_NAME[p.name] || DATA.roster.find(r => personIdOf(r.ehl) && personIdOf(r.ehl) === personIdOf(p.ehl));
+        if (!e5) return p;
+        const posMap = { FWD: 'F', DEF: 'D', GK: 'G' };
+        return { ...p, pos: p.pos || posMap[e5.position] || null, nr: p.nr ?? e5.nr ?? null, height: e5.height, weight: e5.weight,
+          localPhoto: DATA.playerPhotos && DATA.playerPhotos[e5.name] || null }; });
     const nz = v => v ?? '—';
+    const photoOf = p => p.localPhoto || photo(p.ehl);
     const skaters = players.filter(p => p.pos !== 'G').sort((x, y) => (y.p ?? -1) - (x.p ?? -1) || (y.g ?? 0) - (x.g ?? 0) || (x.gp ?? 0) - (y.gp ?? 0) || x.name.localeCompare(y.name));
     const goalieStats = {}; Object.values(prot).forEach(pr => { if (!pr.goalie) return; const k = pr.goalie.name, s = goalieStats[k] || (goalieStats[k] = { name: k, gp: 0, sa: 0, ga: 0 });
       s.gp++; s.sa += pr.goalie.sa; s.ga += pr.goalie.ga; });
@@ -2138,14 +2188,15 @@ showSection(location.hash.slice(1) || 'home');
         const G = pr.goals.filter(x => x.side === 'us' && x.scorer === name).length, A = pr.goals.filter(x => x.side === 'us' && (x.a1 === name || x.a2 === name)).length;
         const pim = pr.penalties.filter(x => x.side === 'us' && x.player === name).reduce((s, x) => s + x.min, 0);
         return `<tr><td>${dShort(g.date)}</td><td class="name">${g.home ? 'vs' : '@'} ${logoImg(g.logo, g.opp)}${esc(g.opp)}</td><td class="num">${g.us}-${g.them} <span class="r ${g.r}">${g.r}</span></td><td class="num">${G}</td><td class="num">${A}</td><td class="num"><b>${G + A}</b></td><td class="num">${pim}</td></tr>`; }).join('');
-      return `<div class="panel cl-pcard"><div style="display:flex;gap:22px;align-items:center">${imgOrPh(photo(p.ehl), 'cl-photo')}
+      return `<div class="panel cl-pcard"><div style="display:flex;gap:22px;align-items:center">${imgOrPh(photoOf(p), 'cl-photo')}
           <div style="flex:1"><div style="font-family:Oswald,sans-serif;font-size:30px;font-weight:600">${esc(p.name)}</div>
-            <div style="color:var(--text-dim);margin-top:4px">${p.pos ? `<span class="pos-badge">${POSL[p.pos]}</span>` : ''}${p.nr != null ? ' #' + p.nr : ''}${p.ehl ? ` · <a href="${p.ehl}" target="_blank" rel="noopener">EHL profils →</a>` : ''}</div>
+            <div style="color:var(--text-dim);margin-top:4px">${p.pos ? `<span class="pos-badge">${POSL[p.pos]}</span>` : ''}${p.nr != null ? ' #' + p.nr : ''}${p.height ? ` · ${p.height}${p.weight ? ' · ' + p.weight : ''}` : ''}${p.ehl ? ` · <a href="${p.ehl}" target="_blank" rel="noopener">EHL profils →</a>` : ''}</div>
             <div class="cl-tot" style="margin-top:16px;grid-template-columns:repeat(5,1fr)">${[['GP', p.gp], ['G', p.g], ['A', p.a], ['P', p.p], ['PIM', p.pim]].map(([l, v]) => `<div><b>${nz(v)}</b><span>${l}</span></div>`).join('')}</div></div></div></div>
         <div class="panel"><h2>Spēles</h2><table class="ovt" style="font-size:14px"><tr><th>Datums</th><th>Pretinieks</th><th class="num">Score</th><th class="num">G</th><th class="num">A</th><th class="num">P</th><th class="num">PIM</th></tr>${logRows || '<tr><td colspan="7" class="empty-note">Nav spēļu</td></tr>'}</table></div>`;
     };
     const sortedPl = players.slice().sort((x, y) => x.name.localeCompare(y.name));
-    const playerPane = players.length ? `<div class="game-nav" style="padding-left:0;padding-right:0"><select class="cl-player">${sortedPl.map(p => `<option${p.name === (skaters[0] ? skaters[0].name : sortedPl[0].name) ? ' selected' : ''}>${esc(p.name)}</option>`).join('')}</select></div><div class="cl-pview">${playerView(skaters[0] ? skaters[0].name : sortedPl[0].name)}</div>` : '<div class="empty-note">Nav datu</div>';
+    const firstPl = skaters[0] ? skaters[0].name : (players[0] && players[0].name);
+    const playerPane = players.length ? `<div class="game-nav cl-selects" style="padding-left:0;padding-right:0"><select class="cl-player">${sortedPl.map(p => `<option${p.name === (skaters[0] ? skaters[0].name : sortedPl[0].name) ? ' selected' : ''}>${esc(p.name)}</option>`).join('')}</select><select class="cl-team">${teamSelectHtml(firstPl, (players.find(x => x.name === firstPl) || {}).ehl, div)}</select></div><div class="cl-pview">${playerView(skaters[0] ? skaters[0].name : sortedPl[0].name)}</div>` : '<div class="empty-note">Nav datu</div>';
 
     // ---- Komandas statistika ----
     const winPct = played.length ? Math.round(W / played.length * 1000) / 10 : 0;
@@ -2172,7 +2223,7 @@ showSection(location.hash.slice(1) || 'home');
     // ---- Sastāvs ----
     const groups = players.some(p => p.pos) ? POS : [[null, 'Spēlētāji']];
     const rosterPane = groups.map(([k, label]) => { const list = players.filter(p => (p.pos || null) === k).sort((x, y) => (y.gp ?? 0) - (x.gp ?? 0) || x.name.localeCompare(y.name)); if (!list.length) return '';
-      return `<div class="roster-section-title">${label}</div><div class="cl-roster">${list.map(p => `<div class="cl-card">${imgOrPh(photo(p.ehl), 'cl-av')}
+      return `<div class="roster-section-title">${label}</div><div class="cl-roster">${list.map(p => `<div class="cl-card">${imgOrPh(photoOf(p), 'cl-av')}
         <div style="min-width:0"><div class="nm">${esc(p.name)} <span style="color:var(--text-faint);font-weight:500">${p.nr != null ? '#' + p.nr : ''}</span></div><div class="mt">${p.pos ? `<span class="pos-badge">${POSL[p.pos]}</span>` : ''}${p.ehl ? ` · <a href="${p.ehl}" target="_blank" rel="noopener">EHL profils →</a>` : ''}</div>
         <div class="st">${(k === 'G' ? [['GP', p.gp]] : [['GP', p.gp], ['G', p.g], ['A', p.a], ['P', p.p], ['PIM', p.pim]]).map(([l, v]) => `<div><b>${nz(v)}</b><span>${l}</span></div>`).join('')}</div></div></div>`).join('')}</div>`; }).join('');
 
@@ -2186,6 +2237,10 @@ showSection(location.hash.slice(1) || 'home');
         <div class="cpane" data-p="roster" style="padding-top:10px">${rosterPane}</div>
       </div>`;
     view._protocol = protocol; view._playerView = playerView;
+    view._openPlayer = name => { const sel = view.querySelector('.cl-player'); if (!sel || ![...sel.options].some(o => o.value === name || o.textContent === name)) return;
+      sel.value = name; view.querySelector('.cl-pview').innerHTML = playerView(name);
+      const ct = view.querySelector('.cl-team'); ct.innerHTML = teamSelectHtml(name, (players.find(x => x.name === name) || {}).ehl, div); ct.style.display = ct.options.length > 1 ? '' : 'none';
+      view.querySelectorAll('.ctab').forEach(x => x.classList.toggle('active', x.dataset.p === 'pl')); view.querySelectorAll('.cpane').forEach(x => x.classList.toggle('on', x.dataset.p === 'pl')); };
   }
   document.querySelectorAll('.club-view').forEach(view => {
     render(view);
@@ -2203,7 +2258,10 @@ showSection(location.hash.slice(1) || 'home');
     });
     view.addEventListener('change', e => {
       if (e.target.matches('.cl-game')) view.querySelector('.cl-proto').innerHTML = view._protocol(e.target.value);
-      if (e.target.matches('.cl-player')) view.querySelector('.cl-pview').innerHTML = view._playerView(e.target.value);
+      if (e.target.matches('.cl-player')) view._openPlayer(e.target.value);
+      if (e.target.matches('.cl-team')) { const name = view.querySelector('.cl-player').value, div = e.target.value;
+        const src = div === view.dataset.div ? view : document.getElementById(div === 'E7' ? 'lv2View' : 'lv3View');
+        view.querySelector('.cl-pview').innerHTML = (src && src._playerView && src._playerView(name)) || '<div class="empty-note" style="padding:20px 0">Nav datu šai komandai</div>'; }
     });
   });
 })();

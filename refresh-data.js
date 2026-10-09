@@ -6,6 +6,10 @@
 const fs = require('fs');
 const path = require('path');
 const { csvToObjects, buildBoxscores, buildPlayers, buildRoster } = require('./pipeline.js');
+// keep a copy of this run's log in the data file (field "runLog"), so problems can be checked from the repo
+const RUN_LOG = [];
+for (const k of ['log', 'error']) { const orig = console[k].bind(console);
+  console[k] = (...args) => { RUN_LOG.push((k === 'error' ? 'ERROR ' : '') + args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' ').slice(0, 600)); orig(...args); }; }
 
 const CSV_URLS = {
   data:        'https://docs.google.com/spreadsheets/d/e/2PACX-1vQZ8tBkOvTwOJO9-hnZdQKpdVB5q2PTEHPyWR7q8G1Xu1cuYnw3zKxoblh0a_jAhvUnZH9QST1WbdLU/pub?gid=2098354828&single=true&output=csv',
@@ -607,13 +611,18 @@ async function fetchPracticeExtras(previous) {
   catch (err) { console.error('club teams: unexpected error, keeping previous value:', err.message); }
   try { teamRosters = await fetchTeamRosters(club || {}, STATIC.teamRosters); }
   catch (err) { console.error('team rosters: unexpected error, keeping previous value:', err.message); }
+  // E7 / E9 team stats (S, SA, PIM, PP%, PK%, FOW%) from the same EHL page as E5
+  const clubTeamStats = { ...(STATIC.clubTeamStats || {}) };
+  for (const [div, id] of [['E7', '402'], ['E9', '404']]) {
+    try { clubTeamStats[div] = await fetchTeamStats(clubTeamStats[div], id, div); } catch (err) { console.error(`team stats ${div}:`, err.message); }
+  }
   let pageSamples = STATIC.pageSamples;
   try { pageSamples = await capturePageSamples(club); } catch (err) { console.error('page samples failed:', err.message); }
   const fullE5 = fromClub(club);
   if (fullE5) { upcomingGames = fullE5; console.log(`upcoming E5: ${fullE5.length} games from the team calendar`); }
 
   const updated = { ...STATIC, boxscores, skaterRows, goalieRows, roster: finalRoster,
-                     leagueTable, leagueTables, leagueStats, club, pageSamples, teamRosters, upcomingGames, birthdays, nameDays, practiceExtras, lastRefreshed: new Date().toISOString() };
+                     leagueTable, leagueTables, leagueStats, clubTeamStats, club, pageSamples, runLog: RUN_LOG.slice(-400), teamRosters, upcomingGames, birthdays, nameDays, practiceExtras, lastRefreshed: new Date().toISOString() };
   fs.writeFileSync(file, JSON.stringify(updated) + '\n');
   console.log(`updated static-data.json: ${boxscores.length} games, latest ${boxscores[boxscores.length - 1].date}`);
 })().catch(err => { console.error('refresh failed, static-data.json left unchanged:', err.message); process.exit(1); });
