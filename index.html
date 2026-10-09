@@ -982,6 +982,39 @@ footer{text-align:center;color:var(--text-faint);font-size:12px;padding:20px;}
 #statsView.show-other > :not(.filter-row):not(#statsOtherTeam){display:none !important;}
 #statsView.show-other #statsOtherTeam{display:block;}
 
+
+/* ---- Bilance: bigger, centred, filling the box ---- */
+.ts-pair>.panel,.cl-two>.panel{display:flex;flex-direction:column;}
+.rec2{flex:1;justify-content:center;gap:40px;padding:10px 10px 6px;}
+.rec-ring{width:190px;height:190px;}
+.rec-ring>div{width:148px;height:148px;}
+.rec-ring b{font-size:38px;}
+.rec-ring span{font-size:13px;}
+.rec-side{max-width:520px;}
+.rec-top{gap:22px;margin-bottom:26px;}
+.rec-gp b{font-size:52px;}
+.rec-gp span{font-size:16px;}
+.pill{padding:8px 20px;font-size:17px;} .pill b{font-size:26px;}
+.rec-goals .t{font-size:15px;margin-bottom:10px;}
+.rec-goals .t b{font-size:36px;}
+.rec-goals .df{font-size:17px;padding:3px 14px;}
+.rec-goals .duel{height:14px;}
+/* ---- II / III: game list rows level with the W/L bars ---- */
+.club-view .gamelog-row{align-items:flex-start;}
+.club-view .wl-header{height:34px;}
+.club-view .wl-list .wl-item{height:36px;}
+.club-view .cl-log{border-collapse:collapse;}
+.club-view .cl-log th{height:34px;padding-top:0;padding-bottom:0;vertical-align:middle;}
+.club-view .cl-log tr td{height:36px;padding-top:0;padding-bottom:0;vertical-align:middle;box-sizing:border-box;}
+.club-view .cl-log td.name{white-space:nowrap;}
+.cl-bottom{display:grid;grid-template-columns:minmax(0,520px) minmax(0,1fr);gap:16px;align-items:stretch;}
+.cl-bottom>.panel{margin:0;}
+.cl-next .ov-up{font-size:15px;padding:10px 0;}
+@media (max-width:900px){.cl-bottom{grid-template-columns:1fr;}}
+.duel.pim .g{background:#C47A3A;} .duel.pim .a{background:#3A4757;opacity:1;}
+.tbl-inner{margin:0;}
+.cl-next .ov-up .when{white-space:nowrap;min-width:64px;}
+.cl-table-next .league-layout{grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);}
 </style>
 </head>
 <body>

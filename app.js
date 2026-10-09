@@ -2092,6 +2092,7 @@ document.getElementById('statsTeamSelect') && document.getElementById('statsTeam
     const ts = ((DATA.clubTeamStats && DATA.clubTeamStats[div] && DATA.clubTeamStats[div].teams) || {})[up(t.name)] || {};
     const hasProt = played.some(g => g.pr);
     const S = hasProt ? sum('s') : (ts.s ?? 0), SA = hasProt ? sum('sa') : (ts.sa ?? 0), PIM = hasProt ? sum('pim') : (ts.pim ?? 0), PIMA = hasProt ? sum('pimA') : 0;
+    const FOW = played.reduce((s, g) => s + (g.pr && g.pr.faceoffs ? g.pr.faceoffs.us : 0), 0), FOL = played.reduce((s, g) => s + (g.pr && g.pr.faceoffs ? g.pr.faceoffs.them : 0), 0);
     const gp = played.length || 1;
     const divs = (DATA.leagueTables && DATA.leagueTables[div] && DATA.leagueTables[div].divisions) || [];
     const ourDiv = Math.max(0, divs.findIndex(d => d.teams.some(x => up(x.team) === up(t.name))));
@@ -2106,7 +2107,7 @@ document.getElementById('statsTeamSelect') && document.getElementById('statsTeam
         const e5 = ROSTER_BY_NAME[p.name] || DATA.roster.find(r => personIdOf(r.ehl) && personIdOf(r.ehl) === personIdOf(p.ehl));
         if (!e5) return p;
         const posMap = { FWD: 'F', DEF: 'D', GK: 'G' };
-        return { ...p, pos: p.pos || posMap[e5.position] || null, nr: p.nr ?? e5.nr ?? null, height: e5.height, weight: e5.weight,
+        return { ...p, pos: p.pos || posMap[e5.position] || null, nr: p.nr ?? e5.nr ?? null, height: e5.height, weight: e5.weight, handedness: e5.handedness,
           localPhoto: DATA.playerPhotos && DATA.playerPhotos[e5.name] || null }; });
     const nz = v => v ?? '—';
     const photoOf = p => p.localPhoto || photo(p.ehl);
@@ -2136,7 +2137,7 @@ document.getElementById('statsTeamSelect') && document.getElementById('statsTeam
 
     // division table. E7 (one table): 1.-4. straight to the playoffs, 5.-12. play-in; Top 10 / rest switch.
     // E9 (three groups): top 2 of each group advance, plus the 2 best of all the other teams as wildcards.
-    const grouped = divs.length > 1;
+    const grouped = div === 'E9' || divs.length > 1;
     const wildcards = new Set();
     if (grouped) divs.flatMap(d => d.teams.slice(2)).sort((x, y) => (y.points || 0) - (x.points || 0) || (x.gp || 0) - (y.gp || 0))
       .slice(0, 2).forEach(x => wildcards.add(up(x.team)));
@@ -2203,14 +2204,22 @@ document.getElementById('statsTeamSelect') && document.getElementById('statsTeam
         const PIMp = mine.reduce((s, g) => s + g.pr.penalties.filter(x => x.side === 'us' && x.player === name).reduce((t, x) => t + x.min, 0), 0);
         p = { ...p0, gp: mine.length, g: G, a: A, p: G + A, pim: PIMp };
       }
+      // power-play goals / assists and game-winning goals, from the goal list of each game
+      const mineG = gamesFor.filter(g => g.pr && g.pr.players.some(x => (x.name || x) === name));
+      const ppg = mineG.reduce((s, g) => s + g.pr.goals.filter(x => x.side === 'us' && x.pp && x.scorer === name).length, 0);
+      const ppa = mineG.reduce((s, g) => s + g.pr.goals.filter(x => x.side === 'us' && x.pp && (x.a1 === name || x.a2 === name)).length, 0);
+      const gwg = mineG.reduce((s, g) => { if (g.r !== 'W') return s; const ours = g.pr.goals.filter(x => x.side === 'us'); const w = ours[g.them]; return s + (w && w.scorer === name ? 1 : 0); }, 0);
+      const pp = (DATA.teamRosters && DATA.teamRosters.people && Object.values(DATA.teamRosters.people).find(x => x.name === name)) || {};
+      const HAND = { LEFT: 'kreisais tvēriens', RIGHT: 'labais tvēriens', L: 'kreisais tvēriens', R: 'labais tvēriens' };
       const logRows = gamesFor.slice().reverse().map(g => { const pr = g.pr; if (!pr || !pr.players.some(x => (x.name || x) === name)) return '';
         const G = pr.goals.filter(x => x.side === 'us' && x.scorer === name).length, A = pr.goals.filter(x => x.side === 'us' && (x.a1 === name || x.a2 === name)).length;
         const pim = pr.penalties.filter(x => x.side === 'us' && x.player === name).reduce((s, x) => s + x.min, 0);
         return `<tr><td>${dShort(g.date)}</td><td class="name">${g.home ? 'vs' : '@'} ${logoImg(g.logo, g.opp)}${esc(g.opp)}</td><td class="num">${g.us}-${g.them} <span class="r ${g.r}">${g.r}</span></td><td class="num">${G}</td><td class="num">${A}</td><td class="num"><b>${G + A}</b></td><td class="num">${pim}</td></tr>`; }).join('');
       return `<div class="panel cl-pcard"><div style="display:flex;gap:22px;align-items:center">${imgOrPh(photoOf(p), 'cl-photo')}
           <div style="flex:1"><div style="font-family:Oswald,sans-serif;font-size:30px;font-weight:600">${esc(p.name)}</div>
-            <div style="color:var(--text-dim);margin-top:4px">${p.pos ? `<span class="pos-badge">${POSL[p.pos]}</span>` : ''}${p.nr != null ? ' #' + p.nr : ''}${p.height ? ` · ${p.height}${p.weight ? ' · ' + p.weight : ''}` : ''}${p.ehl ? ` · <a href="${p.ehl}" target="_blank" rel="noopener">EHL profils →</a>` : ''}</div>
-            <div class="cl-tot" style="margin-top:16px;grid-template-columns:repeat(5,1fr)">${[['GP', p.gp], ['G', p.g], ['A', p.a], ['P', p.p], ['PIM', p.pim]].map(([l, v]) => `<div><b>${nz(v)}</b><span>${l}</span></div>`).join('')}</div></div></div></div>
+            <div style="color:var(--text-dim);margin-top:4px">${p.pos ? `<span class="pos-badge">${POSL[p.pos]}</span>` : ''}${p.nr != null ? ' #' + p.nr : ''}${[p.height || pp.height, p.weight || pp.weight, HAND[p.handedness || pp.hand] || ''].filter(Boolean).map(x => ' · ' + x).join('')}${p.ehl ? ` · <a href="${p.ehl}" target="_blank" rel="noopener">EHL profils →</a>` : ''}</div>
+            <div class="cl-tot" style="margin-top:16px;grid-template-columns:repeat(5,1fr)">${[['GP', p.gp], ['G', p.g], ['A', p.a], ['P', p.p], ['P/GP', p.gp ? (p.p / p.gp).toFixed(2) : null],
+              ['PPG', ppg], ['PPA', ppa], ['PIM', p.pim], ['PIM/GP', p.gp ? (p.pim / p.gp).toFixed(1) : null], ['GWG', gwg]].map(([l, v]) => `<div><b>${nz(v)}</b><span>${l}</span></div>`).join('')}</div></div></div></div>
         <div class="panel"><h2>Spēles</h2><table class="ovt" style="font-size:14px"><tr><th>Datums</th><th>Pretinieks</th><th class="num">Score</th><th class="num">G</th><th class="num">A</th><th class="num">P</th><th class="num">PIM</th></tr>${logRows || '<tr><td colspan="7" class="empty-note">Nav spēļu</td></tr>'}</table></div>`;
     };
     const sortedPl = players.slice().sort((x, y) => x.name.localeCompare(y.name));
@@ -2224,6 +2233,7 @@ document.getElementById('statsTeamSelect') && document.getElementById('statsTeam
     const wl = played.slice().reverse().map(g => `<div class="wl-item">${g.r === 'L' ? '<div class="wl-bar-half"><span class="wl-bar loss" style="width:100%"></span></div><div class="wl-bar-half"></div>' : '<div class="wl-bar-half"></div><div class="wl-bar-half"><span class="wl-bar win" style="width:100%"></span></div>'}</div>`).join('');
     const totals = [['Uzbrukums', [['G', GF, (GF / gp).toFixed(1)], ['S', S, (S / gp).toFixed(1)], ['Shot%', pc(S ? GF / S * 100 : null), null]]],
       ['Aizsardzība', [['GA', GA, (GA / gp).toFixed(1)], ['SA', SA, (SA / gp).toFixed(1)], ['Save%', pc(SA ? (SA - GA) / SA * 100 : null), null]]],
+      ['Iemetieni', [['FOW', FOW, (FOW / gp).toFixed(1)], ['FOL', FOL, (FOL / gp).toFixed(1)], ['FO%', pc(FOW + FOL ? FOW / (FOW + FOL) * 100 : null), null]]],
       ['Disciplīna', [['PIM', PIM, (PIM / gp).toFixed(1)], ['PIM pret', PIMA, (PIMA / gp).toFixed(1)]]]];
     const teamPane = `<div class="bx-pair ts-pair">
         <div class="panel"><h2>Bilance</h2><div class="rec2" style="margin-top:14px">
@@ -2232,12 +2242,14 @@ document.getElementById('statsTeamSelect') && document.getElementById('statsTeam
             <div class="rec-pills"><span class="pill w"><b>${W}</b> W</span><span class="pill l"><b>${L}</b> L</span>${D ? `<span class="pill d"><b>${D}</b> D</span>` : ''}</div></div>
             <div class="rec-goals"><div class="t"><span>Gūtie <b class="g">${GF}</b></span><span class="df ${GF - GA > 0 ? 'pos' : GF - GA < 0 ? 'neg' : ''}">${sgn(GF - GA)}</span><span><b class="a">${GA}</b> Ielaistie</span></div>
               <div class="duel"><span class="g" style="width:${gfShare}%"></span><span class="a" style="width:${100 - gfShare}%"></span></div></div></div></div></div>
-        <div class="panel"><h2>Mēs pret pretiniekiem</h2><div class="cl-duels">${duel('Vārti', GF, GA, '')}${duel('Metieni', S, SA, 'sh')}${duel('Soda minūtes', PIM, PIMA, 'fo', true)}</div></div></div>
+        <div class="panel"><h2>Kopējā statistika</h2><div class="cl-duels">${duel('Vārti', GF, GA, '')}${duel('Metieni', S, SA, 'sh')}${FOW + FOL ? duel('Uzvarētie iemetieni', FOW, FOL, 'fo') : ''}${duel('Soda minūtes', PIM, PIMA, 'pim', true)}</div></div></div>
       <div class="panel"><h2>Spēles</h2><div class="team-stats-row gamelog-row"><div class="team-wl-col"><div class="wl-header"><span style="color:var(--loss)">Zaudējums</span><span style="color:var(--win)">Uzvara</span></div><div class="wl-list">${wl}</div></div>
         <div class="team-gamelog-col"><table class="ovt cl-log" style="font-size:13.5px"><tr><th>Datums</th><th>Pretinieks</th><th class="num">G</th><th class="num">GA</th><th class="num">S</th><th class="num">SA</th><th class="num">PIM</th><th class="num">PIM pret</th><th></th></tr>
           ${played.slice().reverse().map(g => `<tr><td>${g.date}</td><td class="name">${g.home ? 'vs' : '@'} ${logoImg(g.logo, g.opp)}${esc(g.opp)}</td><td class="num">${g.us}</td><td class="num">${g.them}</td><td class="num">${g.s ?? '—'}</td><td class="num">${g.sa ?? '—'}</td><td class="num">${g.pim ?? '—'}</td><td class="num">${g.pimA ?? '—'}</td><td class="num"><a href="#" data-game="${g.date}">Protokols</a></td></tr>`).join('')}</table></div></div></div>
-      <div class="panel" style="max-width:520px"><h2>Sezonas kopsummas un vidējie</h2><table id="clTot-${div}" class="cl-totals"><tr><th></th><th>Kopā</th><th>Vidēji spēlē</th></tr>
-        ${totals.map(([title, rows]) => `<tr class="tt-group"><td colspan="3">${title}</td></tr>` + rows.map(([l, v, av]) => av === null ? `<tr><td>${l}</td><td colspan="2" style="text-align:center"><b>${v}</b></td></tr>` : `<tr><td>${l}</td><td><b>${v}</b></td><td style="color:var(--text-dim)">${av}</td></tr>`).join('')).join('')}</table></div>`;
+      <div class="cl-bottom"><div class="panel"><h2>Sezonas kopsummas un vidējie</h2><table id="clTot-${div}" class="cl-totals"><tr><th></th><th>Kopā</th><th>Vidēji spēlē</th></tr>
+        ${totals.map(([title, rows]) => `<tr class="tt-group"><td colspan="3">${title}</td></tr>` + rows.map(([l, v, av]) => av === null ? `<tr><td>${l}</td><td colspan="2" style="text-align:center"><b>${v}</b></td></tr>` : `<tr><td>${l}</td><td><b>${v}</b></td><td style="color:var(--text-dim)">${av}</td></tr>`).join('')).join('')}</table></div>
+        <div class="panel cl-table-next"><div class="league-layout"><div>${tablePanel.replace('class="panel', 'class="tbl-inner').replace('class="tbl-inner ov-switch', 'class="tbl-inner ov-switch')}</div>
+          <div class="calendar-section cl-next"><div class="league-group-title">Nākamās spēles</div>${upcoming.slice(0, 6).map(g => `<div class="ov-up"><span class="when">${dShort(g.date)}</span><span>${g.home ? 'vs' : '@'} ${logoImg(g.logo, g.opp)}${esc(g.opp)}${g.time ? ' · ' + g.time : ''}${g.arena ? ' · ' + esc(g.arena) : ''}</span></div>`).join('') || '<div class="empty-note">Vēl nekas nav ieplānots</div>'}</div></div></div></div>`;
 
     // ---- Sastāvs ----
     const groups = players.some(p => p.pos) ? POS : [[null, 'Spēlētāji']];

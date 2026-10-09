@@ -586,7 +586,7 @@ async function fetchClubTeams(previous) {
 async function fetchTeamRosters(club, previous) {
   const prev = previous || { people: {}, teams: {} };
   const out = { people: { ...(prev.people || {}) }, teams: { ...(prev.teams || {}) }, fetchedAt: prev.fetchedAt || null };
-  const complete = ['E5', 'E7', 'E9'].every(d => ((prev.teams || {})[d] || []).length);
+  const complete = ['E5', 'E7', 'E9'].every(d => ((prev.teams || {})[d] || []).length) && Object.values(prev.people || {}).every(p => p.v === 2);
   if (complete && prev.fetchedAt && Date.now() - new Date(prev.fetchedAt) < 20 * 3600 * 1000) { console.log('team rosters: fresh (less than a day old), skipped'); return prev; }
   let list = {};
   try { list = JSON.parse(fs.readFileSync(path.join(__dirname, 'namedays.json'), 'utf8')); } catch (e) {}
@@ -607,14 +607,19 @@ async function fetchTeamRosters(club, previous) {
       for (const url of links) {
         const pid = url.match(/\/personas\/[a-z0-9-]+\/(\d+)/)[1];
         ids.push(pid);
-        if (out.people[pid]) continue;
+        if (out.people[pid] && out.people[pid].v === 2) continue;   // v2 = also has height / weight / hand
         try {
           const ph = await getHtml(url);
           const nm = (ph.match(/<h1[^>]*>\s*([^<]{3,60}?)\s*<\/h1>/) || ph.match(/<h2[^>]*class="[^"]*name[^"]*"[^>]*>\s*([^<]{3,60}?)\s*<\/h2>/) || [])[1];
           const slugName = url.match(/\/personas\/([a-z0-9-]+)\//)[1].split('-').map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
           const b = ph.match(/Dzim\S*\s+dati[\s\S]{0,300}?(\d{1,2})\.(\d{1,2})\.(\d{4})/i);
+          // height, weight and shooting hand, if the EHL profile lists them
+          const h = ph.match(/Augums[\s\S]{0,200}?(\d{3})\s*cm/i), w = ph.match(/Svars[\s\S]{0,200}?(\d{2,3})\s*kg/i);
+          const hand = ph.match(/(?:Tvēriens|Satvēriens|Ķer|Nūja)[\s\S]{0,200}?(Kreis|Lab|Left|Right)/i);
           out.people[pid] = { name: nm ? niceName(nm) : slugName, ehl: url,
-            birthday: b ? `${b[3]}-${b[2].padStart(2, '0')}-${b[1].padStart(2, '0')}` : null };
+            birthday: b ? `${b[3]}-${b[2].padStart(2, '0')}-${b[1].padStart(2, '0')}` : null,
+            height: h ? h[1] + 'cm' : null, weight: w ? w[1] + 'kg' : null,
+            hand: hand ? (/^(kreis|left)/i.test(hand[1]) ? 'LEFT' : 'RIGHT') : null, v: 2 };
         } catch (e) { /* try again next day */ }
       }
       // name days from the official list (exact name first, then the same name without accents)
@@ -716,7 +721,8 @@ async function fetchPracticeExtras(previous) {
       const cookie = await divisionCookie(t.divisionId);
       const html = await getHtml(`${EHL}/statistika/tabula?_cb=${Date.now()}`, { headers: { ...BROWSER_HEADERS, ...(cookie ? { Cookie: cookie } : {}) } });
       crossHtml[t.div] = html;
-      const cross = !/standings-table-teams/.test(html) ? null : parseCrossTable(html, t.divisionId);
+      // only E7 is one long cross table; E9 has groups, which the normal reader below handles
+      const cross = t.div !== 'E7' || !/standings-table-teams/.test(html) ? null : parseCrossTable(html, t.divisionId);
       if (cross) { leagueTables[t.div] = { divisions: [{ division: t.div, teams: cross }], fetchedAt: new Date().toISOString() }; console.log(`league table ${t.div}: ${cross.length} teams (cross table)`); continue; }
     } catch (e) { console.error(`league table ${t.div} (cross table):`, e.message); }
     try { leagueTables[t.div] = await fetchLeagueTable(leagueTables[t.div], t.divisionId, t.div); }
