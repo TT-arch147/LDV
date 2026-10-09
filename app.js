@@ -2104,13 +2104,17 @@ document.getElementById('statsTeamSelect') && document.getElementById('statsTeam
         .map(pp => ({ name: pp.name, ehl: pp.ehl, pos: pp.pos || null, nr: pp.nr ?? null, gp: null, g: null, a: null, pim: null })))
       .map(p => ({ ...p, p: p.g == null ? null : p.g + p.a }))
       .map(p => { // copy what the E5 roster sheet already knows about this player
+        // what the EHL profile says (height, weight, hand, position, photo), found by EHL person id
+        const pid0 = personIdOf(p.ehl), RP = (DATA.teamRosters && DATA.teamRosters.people) || {};
+        const prof = (pid0 && RP[pid0]) || Object.values(RP).find(x => personIdOf(x.ehl) === pid0 || x.name === p.name) || {};
+        p = { ...p, pos: p.pos || prof.pos || null, height: prof.height || null, weight: prof.weight || null, handedness: prof.hand || null, ehlPhoto: prof.photo || null };
         const e5 = ROSTER_BY_NAME[p.name] || DATA.roster.find(r => personIdOf(r.ehl) && personIdOf(r.ehl) === personIdOf(p.ehl));
         if (!e5) return p;
         const posMap = { FWD: 'F', DEF: 'D', GK: 'G' };
-        return { ...p, pos: p.pos || posMap[e5.position] || null, nr: p.nr ?? e5.nr ?? null, height: e5.height, weight: e5.weight, handedness: e5.handedness,
+        return { ...p, pos: p.pos || posMap[e5.position] || null, nr: p.nr ?? e5.nr ?? null, height: e5.height || p.height, weight: e5.weight || p.weight, handedness: e5.handedness || p.handedness,
           localPhoto: DATA.playerPhotos && DATA.playerPhotos[e5.name] || null }; });
     const nz = v => v ?? '—';
-    const photoOf = p => p.localPhoto || photo(p.ehl);
+    const photoOf = p => p.localPhoto || p.ehlPhoto || null;
     const skaters = players.filter(p => p.pos !== 'G').sort((x, y) => (y.p ?? -1) - (x.p ?? -1) || (y.g ?? 0) - (x.g ?? 0) || (x.gp ?? 0) - (y.gp ?? 0) || x.name.localeCompare(y.name));
     const goalieStats = {}; Object.values(prot).forEach(pr => { if (!pr.goalie) return; const k = pr.goalie.name, s = goalieStats[k] || (goalieStats[k] = { name: k, gp: 0, sa: 0, ga: 0 });
       s.gp++; s.sa += pr.goalie.sa; s.ga += pr.goalie.ga; });
@@ -2217,7 +2221,7 @@ document.getElementById('statsTeamSelect') && document.getElementById('statsTeam
         return `<tr><td>${dShort(g.date)}</td><td class="name">${g.home ? 'vs' : '@'} ${logoImg(g.logo, g.opp)}${esc(g.opp)}</td><td class="num">${g.us}-${g.them} <span class="r ${g.r}">${g.r}</span></td><td class="num">${G}</td><td class="num">${A}</td><td class="num"><b>${G + A}</b></td><td class="num">${pim}</td></tr>`; }).join('');
       return `<div class="panel cl-pcard"><div style="display:flex;gap:22px;align-items:center">${imgOrPh(photoOf(p), 'cl-photo')}
           <div style="flex:1"><div style="font-family:Oswald,sans-serif;font-size:30px;font-weight:600">${esc(p.name)}</div>
-            <div style="color:var(--text-dim);margin-top:4px">${p.pos ? `<span class="pos-badge">${POSL[p.pos]}</span>` : ''}${p.nr != null ? ' #' + p.nr : ''}${[p.height || pp.height, p.weight || pp.weight, HAND[p.handedness || pp.hand] || ''].filter(Boolean).map(x => ' · ' + x).join('')}${p.ehl ? ` · <a href="${p.ehl}" target="_blank" rel="noopener">EHL profils →</a>` : ''}</div>
+            <div style="color:var(--text-dim);margin-top:4px">${p.pos ? `<span class="pos-badge">${POSL[p.pos]}</span>` : ''}${p.nr != null ? ' #' + p.nr : ''}${[p.height, p.weight, HAND[p.handedness] || ''].filter(Boolean).map(x => ' · ' + x).join('')}${p.ehl ? ` · <a href="${p.ehl}" target="_blank" rel="noopener">EHL profils →</a>` : ''}</div>
             <div class="cl-tot" style="margin-top:16px;grid-template-columns:repeat(5,1fr)">${[['GP', p.gp], ['G', p.g], ['A', p.a], ['P', p.p], ['P/GP', p.gp ? (p.p / p.gp).toFixed(2) : null],
               ['PPG', ppg], ['PPA', ppa], ['PIM', p.pim], ['PIM/GP', p.gp ? (p.pim / p.gp).toFixed(1) : null], ['GWG', gwg]].map(([l, v]) => `<div><b>${nz(v)}</b><span>${l}</span></div>`).join('')}</div></div></div></div>
         <div class="panel"><h2>Spēles</h2><table class="ovt" style="font-size:14px"><tr><th>Datums</th><th>Pretinieks</th><th class="num">Score</th><th class="num">G</th><th class="num">A</th><th class="num">P</th><th class="num">PIM</th></tr>${logRows || '<tr><td colspan="7" class="empty-note">Nav spēļu</td></tr>'}</table></div>`;
