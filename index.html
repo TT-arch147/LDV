@@ -907,6 +907,14 @@ footer{text-align:center;color:var(--text-faint);font-size:12px;padding:20px;}
 .league-layout #calendarBody .calendar-row:not(:first-child) .calendar-opp .league-logo{width:32px;height:32px;}
 .league-layout #calendarBody .calendar-row:not(:first-child) .calendar-when{font-size:15px;}
 .league-layout #calendarBody .calendar-when{text-align:left;}
+
+/* floating info on W / L / D boxes */
+[data-tip]{position:relative;cursor:default;}
+[data-tip]:hover::after{content:attr(data-tip);position:absolute;left:50%;bottom:calc(100% + 8px);transform:translateX(-50%);z-index:30;
+  white-space:nowrap;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px 10px;
+  font:600 12.5px 'Inter',sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.5);pointer-events:none;}
+[data-tip]:hover::before{content:'';position:absolute;left:50%;bottom:calc(100% + 3px);transform:translateX(-50%) rotate(45deg);width:9px;height:9px;
+  background:var(--panel);border-right:1px solid var(--line);border-bottom:1px solid var(--line);z-index:31;}
 </style>
 </head>
 <body>

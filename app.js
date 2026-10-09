@@ -1763,7 +1763,11 @@ renderStatsTab();
   }
 
   // ---- render one team box ----
-  const form = (list, away) => `<div class="match-form">${away ? '' : '<span class="lbl5" style="margin-left:0">Last 5</span>'}${list.slice(-5).map(p => `<span class="f ${p.result}">${p.result}</span>`).join('')}${away ? '<span class="lbl5" style="margin-right:0">Last 5</span>' : ''}</div>`;
+  // hover text for a W / L / D box: "vs Huligan 1-2 · 30. sept."
+  const LVM = ['janv.','febr.','marts','apr.','maijs','jūn.','jūl.','aug.','sept.','okt.','nov.','dec.'];
+  const tip = p => { const [, m, d] = String(p.date || '').split('-').map(Number);
+    return esc(`${p.home ? 'vs' : '@'} ${p.opp} ${p.us}-${p.them}${d ? ` · ${d}. ${LVM[m - 1]}` : ''}`); };
+  const form = (list, away) => `<div class="match-form">${away ? '' : '<span class="lbl5" style="margin-left:0">Last 5</span>'}${list.slice(-5).map(p => `<span class="f ${p.result}" data-tip="${tip(p)}">${p.result}</span>`).join('')}${away ? '<span class="lbl5" style="margin-right:0">Last 5</span>' : ''}</div>`;
   const boxLink = (link, label) => !link ? '' : link.startsWith('#box:')
     ? `<a href="#stats" data-boxdate="${link.slice(5)}">${label}</a>` : `<a href="${link}" target="_blank" rel="noopener">${label}</a>`;
   const resRow = (logo, name, p) => !p ? '' : `<div class="res-row">${logoHtml(logo, name, 30)}<div style="min-width:0">
@@ -1796,7 +1800,7 @@ renderStatsTab();
       ['Last results', `${resRow(t.logo, t.name, lastUs)}${n ? resRow(t.oppLogo, n.opp, lastThem) : ''}${!lastUs && !lastThem ? '<div class="empty-note">No games played yet</div>' : ''}`],
       ['Season so far', `<div class="home-big">${W}-${Lc}${us ? ` · ${ord(us.n)}` : ''}</div>
         <div class="home-sub">${t.season.length} games${us ? ` · ${us.pts} pts in ${esc(us.div)}` : ''}</div>
-        <div class="home-form">${t.season.slice(-5).map(p => `<span class="${p.result}">${p.result}</span>`).join('')}</div>`],
+        <div class="home-form">${t.season.slice(-5).map(p => `<span class="${p.result}" data-tip="${tip(p)}">${p.result}</span>`).join('')}</div>`],
       ['This week', weekRows(t)],
     ];
     return `<section class="team-block"><div class="home-top">
