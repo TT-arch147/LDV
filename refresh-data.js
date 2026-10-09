@@ -224,6 +224,42 @@ async function fetchTeamStats(previous, divisionId = '400', label = 'E5') {
   }
 }
 
+// ---------- E7 / E9 team logos into the logos folder ----------
+// Reads the teams of a division from the league's "Statistika > Komandas" page and saves each team's logo
+// (largest size EHL has) as logos/<team-name>.png. Files that already exist are never touched, so a logo you
+// upload yourself always wins. The workflow commits the logos folder.
+async function downloadTeamLogos(divisionId, label) {
+  try {
+    const cookie = await divisionCookie(divisionId);
+    const html = await getHtml(`${EHL}/statistika/komandas?_cb=${Date.now()}`, { headers: { ...BROWSER_HEADERS, ...(cookie ? { Cookie: cookie } : {}) } });
+    const div = (html.match(/stat-div-(\d+)/) || [])[1];
+    if (div !== divisionId) throw new Error(`page shows division ${div}, not ${divisionId}`);
+    const teams = [...html.matchAll(/<a href="\/komandas\/[^"]+"><img src="\/uploads\/team\/px\d+\/team_(\d+)\.png[^"]*"[^>]*class="team-logo">([^<]+)<\/a>/g)]
+      .map(m => ({ img: m[1], name: niceName(m[2].trim()) }));
+    const fileSlug = n => plain(n).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    let saved = 0;
+    for (const t of teams) {
+      if (/^ledus ve/i.test(plain(t.name))) continue;
+      const file = path.join(__dirname, 'logos', fileSlug(t.name) + '.png');
+      if (fs.existsSync(file)) continue;
+      for (const size of ['px150', 'px100', 'px50']) {
+        try {
+          const res = await fetch(`${EHL}/uploads/team/${size}/team_${t.img}.png`, { headers: BROWSER_HEADERS });
+          if (!res.ok) continue;
+          const buf = Buffer.from(await res.arrayBuffer());
+          if (buf.length < 200) continue;
+          fs.mkdirSync(path.dirname(file), { recursive: true });
+          fs.writeFileSync(file, buf); saved++;
+          break;
+        } catch (e) { /* try the next size */ }
+      }
+    }
+    console.log(`logos ${label}: ${teams.length} teams on the page, ${saved} new logo files saved`);
+  } catch (err) {
+    console.error(`logos ${label} failed:`, err.message);
+  }
+}
+
 // ---------- Home page: all three club teams (E5, E7, E9) from the EHL calendar ----------
 // Each team's own calendar view (the same POST the E5 code above uses) lists its played games
 // with scores and protocol links, and its upcoming games. The same view for the next opponent
@@ -544,6 +580,8 @@ async function fetchPracticeExtras(previous) {
   let leagueStats = STATIC.leagueStats;
   try { leagueStats = await fetchTeamStats(STATIC.leagueStats, '400', 'E5'); }
   catch (err) { console.error('team stats: unexpected error, keeping previous value:', err.message); }
+  await downloadTeamLogos('402', 'E7');
+  await downloadTeamLogos('404', 'E9');
   let club = STATIC.club, teamRosters = STATIC.teamRosters;
   try { club = await fetchClubTeams(STATIC.club); }
   catch (err) { console.error('club teams: unexpected error, keeping previous value:', err.message); }
