@@ -886,6 +886,13 @@ footer{text-align:center;color:var(--text-faint);font-size:12px;padding:20px;}
 /* home: result badge in the last-meeting line centred on the text */
 .match-foot span{display:inline-flex;align-items:center;flex-wrap:wrap;gap:4px;}
 .match-foot .home-res{margin-left:4px;vertical-align:middle;line-height:1.4;}
+
+/* roster: three players per row */
+.roster-grid{grid-template-columns:repeat(3,minmax(0,1fr));}
+/* calendar: practices in orange-brown */
+.ce-p{background:rgba(196,122,58,.16);border:1px solid rgba(196,122,58,.6);}
+.ce-p .ce-ic{color:#D9924F;}
+.t-practice{--c:#C47A3A;}
 </style>
 </head>
 <body>

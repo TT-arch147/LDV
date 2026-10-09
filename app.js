@@ -1090,8 +1090,11 @@ const POS_GROUPS = [
 const EHL_E5_IDS = new Set(((DATA.teamRosters && DATA.teamRosters.teams && DATA.teamRosters.teams.E5) || []).map(String));
 const personId = url => ((String(url || '').match(/\/personas\/[a-z0-9-]+\/(\d+)/) || [])[1]);
 const CURRENT_ROSTER = EHL_E5_IDS.size ? DATA.roster.filter(p => EHL_E5_IDS.has(personId(p.ehl))) : DATA.roster;
+// games played (the GP shown on each card: all seasons, skaters + goalies), most games first
+const ROSTER_GP = {};
+DATA.skaterRows.concat(DATA.goalieRows || []).forEach(r => { ROSTER_GP[r.player] = (ROSTER_GP[r.player] || 0) + 1; });
 document.getElementById('rosterSections').innerHTML = POS_GROUPS.map(g=>{
-  const players = CURRENT_ROSTER.filter(p=>p.position===g.key);
+  const players = CURRENT_ROSTER.filter(p=>p.position===g.key).sort((x, y) => (ROSTER_GP[y.name] || 0) - (ROSTER_GP[x.name] || 0) || x.name.localeCompare(y.name));
   if(!players.length) return '';
   return `<div class="roster-section-title">${g.label}</div>
     <div class="roster-grid">${players.map(rosterCard).join('')}</div>`;
