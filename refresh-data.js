@@ -260,6 +260,26 @@ async function downloadTeamLogos(divisionId, label) {
   }
 }
 
+// ---------- page samples for the next step (protocol reader + E7 table) ----------
+// Saves trimmed copies of one E7 and one E9 game protocol and of the E7 table page into the data file,
+// so their exact layout can be checked from the (public) repo before writing the readers for them.
+async function capturePageSamples(club) {
+  const slim = html => html.replace(/<head[\s\S]*?<\/head>/i, '').replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<header[\s\S]*?<\/header>/i, '').replace(/<footer[\s\S]*?<\/footer>/i, '').replace(/\s+/g, ' ').slice(0, 60000);
+  const out = { capturedAt: new Date().toISOString() };
+  for (const div of ['E7', 'E9']) {
+    const g = ((club && club[div] && club[div].games) || []).filter(x => x.played && x.protocol).pop();
+    if (!g) continue;
+    try { out['protocol' + div] = { url: g.protocol, html: slim(await getHtml(g.protocol)) }; } catch (e) { out['protocol' + div] = { url: g.protocol, error: e.message }; }
+  }
+  try {
+    const cookie = await divisionCookie('402');
+    out.tableE7 = slim(await getHtml(`${EHL}/statistika/tabula?_cb=${Date.now()}`, { headers: { ...BROWSER_HEADERS, ...(cookie ? { Cookie: cookie } : {}) } }));
+  } catch (e) { out.tableE7 = 'error: ' + e.message; }
+  console.log('page samples saved:', Object.keys(out).join(', '));
+  return out;
+}
+
 // ---------- Home page: all three club teams (E5, E7, E9) from the EHL calendar ----------
 // Each team's own calendar view (the same POST the E5 code above uses) lists its played games
 // with scores and protocol links, and its upcoming games. The same view for the next opponent
@@ -587,11 +607,13 @@ async function fetchPracticeExtras(previous) {
   catch (err) { console.error('club teams: unexpected error, keeping previous value:', err.message); }
   try { teamRosters = await fetchTeamRosters(club || {}, STATIC.teamRosters); }
   catch (err) { console.error('team rosters: unexpected error, keeping previous value:', err.message); }
+  let pageSamples = STATIC.pageSamples;
+  try { pageSamples = await capturePageSamples(club); } catch (err) { console.error('page samples failed:', err.message); }
   const fullE5 = fromClub(club);
   if (fullE5) { upcomingGames = fullE5; console.log(`upcoming E5: ${fullE5.length} games from the team calendar`); }
 
   const updated = { ...STATIC, boxscores, skaterRows, goalieRows, roster: finalRoster,
-                     leagueTable, leagueTables, leagueStats, club, teamRosters, upcomingGames, birthdays, nameDays, practiceExtras, lastRefreshed: new Date().toISOString() };
+                     leagueTable, leagueTables, leagueStats, club, pageSamples, teamRosters, upcomingGames, birthdays, nameDays, practiceExtras, lastRefreshed: new Date().toISOString() };
   fs.writeFileSync(file, JSON.stringify(updated) + '\n');
   console.log(`updated static-data.json: ${boxscores.length} games, latest ${boxscores[boxscores.length - 1].date}`);
 })().catch(err => { console.error('refresh failed, static-data.json left unchanged:', err.message); process.exit(1); });

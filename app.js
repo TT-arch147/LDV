@@ -118,10 +118,11 @@ document.getElementById('nextGame').addEventListener('click', ()=>{ if(idx<filte
 const STATS_VIEWS = { overview:'overviewView', box:'boxView', stats:'statsView', team:'teamView', roster:'rosterView', methodology:'methodologyView' };
 let currentStatsTab = 'overview';
 function showSection(sec){
-  if (!['home','stats','calendar'].includes(sec)) sec = 'home';
+  if (!['home','stats','calendar','lv2','lv3'].includes(sec)) sec = 'home';
   document.querySelectorAll('.main-btn').forEach(b=>b.classList.toggle('active', b.dataset.section===sec));
   document.getElementById('homeView').classList.toggle('hidden', sec!=='home');
   document.getElementById('calendarView').classList.toggle('hidden', sec!=='calendar');
+  ['lv2','lv3'].forEach(k => { const v = document.getElementById(k + 'View'); if (v) v.classList.toggle('hidden', sec !== k); });
   document.getElementById('statsBar').classList.toggle('hidden', sec!=='stats');
   Object.entries(STATS_VIEWS).forEach(([tab,id])=>document.getElementById(id).classList.toggle('hidden', !(sec==='stats' && tab===currentStatsTab)));
 }
@@ -1998,12 +1999,221 @@ showSection(location.hash.slice(1) || 'home');
   apply();
 })();
 
+// ---------------- Ledus Veči II (E7) and III (E9) statistika ----------------
+// Built from EHL data: games and results (team calendar), protocols (goals, assists, penalties, shots, goalie),
+// division table, roster. Highlight links come from the "Highlights" sheet tab. Same look as the Ledus Veči pages.
+(function(){
+  const MON = ['janv.','febr.','marts','apr.','maijs','jūn.','jūl.','aug.','sept.','okt.','nov.','dec.'];
+  const WDS = ['Svētd.','Pirmd.','Otrd.','Trešd.','Ceturtd.','Piektd.','Sestd.'];
+  const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
+  const up = s => String(s || '').trim().toUpperCase();
+  const nice = s => String(s || '').toLowerCase().replace(/(^|[\s/-])\S/g, c => c.toUpperCase()).replace(/\b(Ii|Iii|Iv|Vi)\b/g, m => m.toUpperCase()).replace(/&amp;/g, '&');
+  const dShort = iso => { const [, m, d] = iso.split('-').map(Number); return `${d}. ${MON[m - 1]}`; };
+  const dLong = iso => { const [y, m, d] = iso.split('-').map(Number); return `${WDS[new Date(y, m - 1, d).getDay()]}, ${d}. ${MON[m - 1]} ${y}`; };
+  const today = new Date().toISOString().slice(0, 10);
+  const initials = n => String(n).split(/\s+/).filter(Boolean).map(w => w[0]).join('').slice(0, 2).toUpperCase();
+  const logoImg = (url, name, cls = 'tlogo') => url ? `<img class="${cls}" src="${url}" alt="">` : `<span class="tlogo ph">${esc(initials(name))}</span>`;
+  const bigLogo = (url, name) => url ? `<img src="${url}" alt="" style="width:84px;height:84px;object-fit:contain">` : `<div class="ph-logo" style="width:84px;height:84px;font-size:28px">${esc(initials(name))}</div>`;
+  const res = (a, b) => a > b ? 'W' : a < b ? 'L' : 'D';
+  const pc = v => v == null || isNaN(v) ? '—' : Math.round(v * 10) / 10 + '%';
+  const sgn = v => v > 0 ? '+' + v : String(v);
+  const POS = [['F', 'Uzbrucēji'], ['D', 'Aizsargi'], ['G', 'Vārtsargi']];
+  const POSL = { F: 'FWD', D: 'DEF', G: 'GK' };
+  const photo = (ehl, size = 'px150') => { const id = (String(ehl || '').match(/\/personas\/[a-z0-9-]+\/(\d+)/) || [])[1];
+    return id ? `https://ehl.entuziasti.com/uploads/player/${size}/player_${id}.jpg` : null; };
+  const imgOrPh = (src, cls) => src ? `<img class="${cls}" src="${src}" alt="" onerror="this.outerHTML='<div class=&quot;${cls} ph&quot;></div>'">` : `<div class="${cls} ph"></div>`;
+  const chips = (list, on) => `<div class="grp-chips">${list.map((n, i) => `<button type="button" data-i="${i}" class="${i === on ? 'on' : ''}">${esc(n)}</button>`).join('')}</div>`;
+  const parts = (list, on) => list.map((b, i) => `<div class="ov-part" data-i="${i}"${i === on ? '' : ' style="display:none"'}>${b}</div>`).join('');
+  const duel = (lbl, f, ag, cls, lowGood) => { const sh = (f + ag) ? f / (f + ag) * 100 : 50, df = f - ag, good = lowGood ? -df : df;
+    return `<div class="pd"><div class="lbl">${lbl}</div><div class="t"><b>${f}</b><span class="sep">:</span><b class="ag">${ag}</b><span class="df ${good > 0 ? 'pos' : good < 0 ? 'neg' : ''}">${sgn(df)}</span></div>
+      <div class="duel ${cls}"><span class="g" style="width:${sh}%"></span><span class="a" style="width:${100 - sh}%"></span></div></div>`; };
+
+  function render(view){
+    const div = view.dataset.div, t = DATA.club && DATA.club[div];
+    if (!t || !t.games) { view.innerHTML = '<div class="wrap"><div class="empty-note" style="padding:30px 0">Dati vēl nav ielādēti.</div></div>'; return; }
+    const names = t.names || {}, logos = t.logos || {};
+    const prot = {}; ((DATA.clubGames && DATA.clubGames[div]) || []).forEach(p => prot[p.date] = p);
+    const games = t.games.filter(g => g.date).sort((x, y) => x.date < y.date ? -1 : 1).map(g => {
+      const home = g.home.abbr === t.abbr, o = home ? g.away : g.home, pr = prot[g.date] || null;
+      return { date: g.date, home, opp: names[o.abbr] || o.abbr, logo: logos[o.abbr] || null, played: g.played,
+        us: home ? g.hg : g.ag, them: home ? g.ag : g.hg, r: g.played ? res(home ? g.hg : g.ag, home ? g.ag : g.hg) : null,
+        time: g.time, arena: g.arena ? nice(g.arena) : '', link: g.protocol, pr,
+        s: pr ? pr.shots.us : null, sa: pr ? pr.shots.them : null,
+        pim: pr ? pr.penalties.filter(x => x.side === 'us').reduce((s, x) => s + x.min, 0) : null,
+        pimA: pr ? pr.penalties.filter(x => x.side === 'them').reduce((s, x) => s + x.min, 0) : null }; });
+    const played = games.filter(g => g.played), upcoming = games.filter(g => !g.played && g.date >= today);
+    const W = played.filter(g => g.r === 'W').length, L = played.filter(g => g.r === 'L').length, D = played.filter(g => g.r === 'D').length;
+    const sum = k => played.reduce((s, g) => s + (g[k] || 0), 0), GF = sum('us'), GA = sum('them'), S = sum('s'), SA = sum('sa'), PIM = sum('pim'), PIMA = sum('pimA');
+    const gp = played.length || 1;
+    const divs = (DATA.leagueTables && DATA.leagueTables[div] && DATA.leagueTables[div].divisions) || [];
+    const ourDiv = Math.max(0, divs.findIndex(d => d.teams.some(x => up(x.team) === up(t.name))));
+    const pos = divs[ourDiv] ? divs[ourDiv].teams.findIndex(x => up(x.team) === up(t.name)) : -1;
+    // players: from the protocols when the bot has read them, otherwise just the EHL roster (no numbers yet)
+    const fromProt = (DATA.clubPlayers && DATA.clubPlayers[div]) || null;
+    const Rr = DATA.teamRosters || {};
+    const players = (fromProt || ((Rr.teams && Rr.teams[div]) || []).map(id => Rr.people && Rr.people[id]).filter(Boolean)
+        .map(pp => ({ name: pp.name, ehl: pp.ehl, pos: pp.pos || null, nr: pp.nr ?? null, gp: null, g: null, a: null, pim: null })))
+      .map(p => ({ ...p, p: p.g == null ? null : p.g + p.a }));
+    const nz = v => v ?? '—';
+    const skaters = players.filter(p => p.pos !== 'G').sort((x, y) => (y.p ?? -1) - (x.p ?? -1) || (y.g ?? 0) - (x.g ?? 0) || (x.gp ?? 0) - (y.gp ?? 0) || x.name.localeCompare(y.name));
+    const goalieStats = {}; Object.values(prot).forEach(pr => { if (!pr.goalie) return; const k = pr.goalie.name, s = goalieStats[k] || (goalieStats[k] = { name: k, gp: 0, sa: 0, ga: 0 });
+      s.gp++; s.sa += pr.goalie.sa; s.ga += pr.goalie.ga; });
+    const goalies = Object.values(goalieStats);
+
+    // ---- Pārskats ----
+    const head = `<div class="ov-head"><img src="${teamLogo('Ledus Veči')}" alt=""><div><div style="display:flex;align-items:center;gap:10px"><span class="div-badge">${div}</span><span class="ov-title">${esc(t.name)}</span></div>
+        <div class="ov-sub">Sezona 2026-2027</div></div>
+      <div class="ov-stats"><div class="ov-stat"><b>${W}-${L}${D ? '-' + D : ''}</b><span>Bilance</span></div>
+        <div class="ov-stat"><b>${pos >= 0 ? (pos + 1) + '. vieta' : '-'}</b><span>${pos >= 0 ? esc(nice(divs[ourDiv].division)) : div}</span></div>
+        <div class="ov-stat"><b>${pos >= 0 ? divs[ourDiv].teams[pos].points : '-'}</b><span>Punkti</span></div>
+        <div class="ov-stat"><b>${GF}-${GA}</b><span>Vārtu attiecība</span></div></div></div>`;
+    const resultsHtml = played.length ? `<table class="ovt"><tr><th>Datums</th><th>Pretinieks</th><th class="num">Score</th><th></th></tr>
+      ${played.slice().reverse().map(g => `<tr><td>${dShort(g.date)}</td><td class="name">${g.home ? 'vs' : '@'} ${logoImg(g.logo, g.opp)}${esc(g.opp)}</td>
+        <td class="num">${g.us}-${g.them}<span class="r ${g.r}">${g.r}</span></td><td class="num"><a href="#" data-game="${g.date}">Protokols</a></td></tr>`).join('')}</table>`
+      : '<div class="empty-note">Vēl nav aizvadītu spēļu</div>';
+    const upHtml = upcoming.map(g => `<div class="ov-up"><span class="when">${dShort(g.date)}</span><span>${g.home ? 'vs' : '@'} ${logoImg(g.logo, g.opp)}${esc(g.opp)}${g.time ? ' · ' + g.time : ''}${g.arena ? ' · ' + esc(g.arena) : ''}</span></div>`).join('')
+      || '<div class="empty-note">Vēl nekas nav ieplānots</div>';
+    const scoringHtml = fromProt && skaters.length ? `<table class="ovt"><tr><th>Player</th><th class="num">GP</th><th class="num">G</th><th class="num">A</th><th class="num">P</th><th class="num">PIM</th></tr>
+      ${skaters.map((p, i) => `<tr${i >= 10 ? ' class="extra" style="display:none"' : ''}><td class="name">${esc(p.name)}</td><td class="num">${p.gp}</td><td class="num">${p.g}</td><td class="num">${p.a}</td><td class="num"><b>${p.p}</b></td><td class="num">${p.pim}</td></tr>`).join('')}</table>
+      ${skaters.length > 10 ? `<button class="more-btn" data-more="1">Rādīt visus ${skaters.length} spēlētājus</button>` : ''}` : '<div class="empty-note">Spēlētāju statistika vēl nav ielādēta</div>';
+    const goaliesHtml = goalies.length ? `<table class="ovt"><tr><th>Goalie</th><th class="num">GP</th><th class="num">SA</th><th class="num">SV</th><th class="num">GA</th><th class="num">SV%</th></tr>
+      ${goalies.map(g => `<tr><td class="name">${esc(g.name)}</td><td class="num">${g.gp}</td><td class="num">${g.sa}</td><td class="num">${g.sa - g.ga}</td><td class="num">${g.ga}</td><td class="num"><b>${pc(g.sa ? (g.sa - g.ga) / g.sa * 100 : null)}</b></td></tr>`).join('')}</table>` : '<div class="empty-note">Nav datu</div>';
+
+    // division table. E7 (one table): 1.-4. straight to the playoffs, 5.-12. play-in; Top 10 / rest switch.
+    // E9 (three groups): top 2 of each group advance, plus the 2 best of all the other teams as wildcards.
+    const grouped = divs.length > 1;
+    const wildcards = new Set();
+    if (grouped) divs.flatMap(d => d.teams.slice(2)).sort((x, y) => (y.points || 0) - (x.points || 0) || (x.gp || 0) - (y.gp || 0))
+      .slice(0, 2).forEach(x => wildcards.add(up(x.team)));
+    const tableRows = (teams, offset) => teams.map((x, i) => { const n = offset + i + 1, wc = wildcards.has(up(x.team));
+      const cut = grouped ? (n === 2 ? 'cut-po' : '') : (n === 4 ? 'cut-po' : n === 12 ? 'cut-pi' : '');
+      return `<tr class="${[up(x.team) === up(t.name) ? 'me' : '', cut, wc ? 'wc' : ''].join(' ')}"><td>${n}</td><td class="name">${esc(nice(x.team))}${wc ? ' <span class="wc-badge">WC</span>' : ''}</td><td class="num">${x.gp ?? ''}</td><td class="num"><b>${x.points ?? ''}</b></td></tr>`; }).join('');
+    const tableOf = (teams, offset) => `<table class="ovt"><tr><th>#</th><th>Team</th><th class="num">GP</th><th class="num">PTS</th></tr>${tableRows(teams, offset)}</table>`;
+    const legend = grouped ? '<div class="tbl-legend"><span class="po"></span>1.-2. izslēgšanas spēles <i class="wc-badge">WC</i> wildcard (2 labākie no pārējām komandām)</div>'
+      : '<div class="tbl-legend"><span class="po"></span>1.-4. izslēgšanas spēles <span class="pi"></span>5.-12. play-in</div>';
+    let tablePanel = '<div class="panel"><div class="empty-note">Tabula vēl nav ielādēta</div></div>';
+    if (grouped) tablePanel = `<div class="panel ov-switch"><div class="panel-head"><span class="league-group-title">${div} tabula</span>${chips(divs.map(d => nice(d.division)), ourDiv)}</div>${parts(divs.map(d => tableOf(d.teams, 0)), ourDiv)}${legend}</div>`;
+    else if (divs.length === 1) { const all = divs[0].teams, half = pos >= 10 ? 1 : 0;
+      tablePanel = all.length > 10
+        ? `<div class="panel ov-switch"><div class="panel-head"><span class="league-group-title">${div} tabula</span>${chips(['Top 10', `11.-${all.length}.`], half)}</div>${parts([tableOf(all.slice(0, 10), 0), tableOf(all.slice(10), 10)], half)}${legend}</div>`
+        : `<div class="panel"><div class="panel-head"><span class="league-group-title">${div} tabula</span></div>${tableOf(all, 0)}${legend}</div>`; }
+    const overview = `${head}<div class="ov-grid">
+        <div><div class="panel ov-switch"><div class="panel-head"><span class="league-group-title">Spēles</span>${chips(['Aizvadītās spēles', 'Gaidāmās'], 0)}</div>${parts([resultsHtml, upHtml], 0)}</div>
+             <div class="panel"><div class="panel-head"><span class="league-group-title">Vārtsargi</span></div>${goaliesHtml}</div></div>
+        <div><div class="panel"><div class="panel-head"><span class="league-group-title">Rezultatīvākie spēlētāji</span></div>${scoringHtml}</div></div>
+        <div>${tablePanel}</div></div>`;
+
+    // ---- Protokols ----
+    const protocol = date => {
+      const g = played.find(x => x.date === date); if (!g) return '<div class="empty-note">Nav spēļu</div>';
+      const pr = g.pr, us = t.name;
+      const side = (s) => s === 'us' ? (g.home ? 'L' : 'R') : (g.home ? 'R' : 'L');
+      const goalsOf = s => pr ? pr.goals.filter(x => x.side === s).map((x, i) => `<div class="goal-item"><span class="goal-num">${i + 1}</span><div style="flex:1"><div class="goal-scorer">${esc(x.scorer)}${x.pp ? ' <span class="ppt">PP</span>' : ''}</div>
+          ${x.a1 ? `<div class="goal-assists">Piespēles: ${esc([x.a1, x.a2].filter(Boolean).join(', '))}</div>` : ''}<div class="goal-assists">${x.period}. periods · ${x.time}</div></div>${x.video ? `<a class="goal-video" href="${x.video}" target="_blank" rel="noopener">▶ video</a>` : ''}</div>`).join('') || '<div class="empty-note">—</div>' : '<div class="empty-note">Protokols vēl nav ielādēts</div>';
+      const L = { name: g.home ? us : g.opp, logo: g.home ? teamLogo('Ledus Veči') : g.logo, goals: g.home ? g.us : g.them, s: g.home ? 'us' : 'them' };
+      const Rt = { name: g.home ? g.opp : us, logo: g.home ? g.logo : teamLogo('Ledus Veči'), goals: g.home ? g.them : g.us, s: g.home ? 'them' : 'us' };
+      const bar = (lbl, a, b) => { const sh = (a + b) ? a / (a + b) * 100 : 50; return `<div class="compare-row"><div class="compare-labels"><span class="h">${a}</span><span class="mid">${lbl}</span><span class="a">${b}</span></div><div class="duel sh" style="height:8px"><span class="g" style="width:${sh}%"></span><span class="a" style="width:${100 - sh}%"></span></div></div>`; };
+      const pens = pr ? pr.penalties.map(x => `<div class="pen-row"><span>${x.side === 'us' ? esc(us) : esc(g.opp)}</span><b>${esc(x.player)}</b><span>${x.min} min · ${esc(x.reason || '')}</span></div>`).join('') : '';
+      return `<div class="bx-pair bx-top">
+          <div class="scoreboard"><div class="sb-meta" style="text-align:center;color:var(--text-dim);font-size:13px">${dLong(g.date)}${g.arena ? ' · ' + esc(g.arena) : ''}</div>
+            <div class="sb-row" style="margin-top:16px"><div class="sb-team" style="text-align:center">${bigLogo(L.logo, L.name)}<div class="sb-team-name" style="font-family:Oswald,sans-serif;font-size:22px;font-weight:600;margin-top:8px">${esc(L.name).toUpperCase()}</div></div>
+              <div style="font-family:Oswald,sans-serif;font-size:56px;font-weight:700;margin:0 24px">${L.goals} <span style="color:var(--text-faint)">-</span> ${Rt.goals}</div>
+              <div class="sb-team" style="text-align:center">${bigLogo(Rt.logo, Rt.name)}<div class="sb-team-name" style="font-family:Oswald,sans-serif;font-size:22px;font-weight:600;margin-top:8px">${esc(Rt.name).toUpperCase()}</div></div></div>
+            <div style="text-align:center;margin-top:14px"><span class="result-badge ${g.r}" style="font-family:Oswald,sans-serif;font-weight:600;padding:4px 14px;border-radius:999px;background:${g.r === 'W' ? 'rgba(76,201,142,.15);color:var(--win)' : 'rgba(225,90,90,.15);color:var(--loss)'}">${g.r === 'W' ? 'UZVARA' : g.r === 'L' ? 'ZAUDĒJUMS' : 'NEIZŠĶIRTS'}</span></div>
+            ${g.link ? `<div style="text-align:center;margin-top:12px"><a href="${g.link}" target="_blank" rel="noopener">EHL protokols →</a></div>` : ''}</div>
+          <div class="panel bx-stats"><h2>Spēles statistika</h2>${pr ? [bar('Metieni vārtos', L.s === 'us' ? pr.shots.us : pr.shots.them, L.s === 'us' ? pr.shots.them : pr.shots.us),
+              bar('Soda minūtes', L.s === 'us' ? g.pim : g.pimA, L.s === 'us' ? g.pimA : g.pim)].join('') +
+              (pr.goalie ? `<div class="gk-line">Vārtsargs: <b>${esc(pr.goalie.name)}</b> · ${pr.goalie.sa - pr.goalie.ga}/${pr.goalie.sa} · ${pc((pr.goalie.sa - pr.goalie.ga) / pr.goalie.sa * 100)}</div>` : '') : '<div class="empty-note">Protokols vēl nav ielādēts</div>'}</div></div>
+        <div class="bx-pair"><div class="panel"><h2>Vārti</h2><div class="goal-cols"><div><div class="goal-col-title">${logoImg(L.logo, L.name)}<span>${esc(L.name).toUpperCase()}</span></div>${goalsOf(L.s)}</div>
+            <div><div class="goal-col-title">${logoImg(Rt.logo, Rt.name)}<span>${esc(Rt.name).toUpperCase()}</span></div>${goalsOf(Rt.s)}</div></div></div>
+          <div class="panel"><h2>Noraidījumi</h2>${pens || '<div class="empty-note">Nav</div>'}</div></div>`;
+    };
+    const gameOpts = played.slice().reverse().map(g => `<option value="${g.date}">${g.date} · ${g.home ? 'vs' : '@'} ${esc(g.opp)} (${g.us}-${g.them})</option>`).join('');
+    const protoPane = played.length ? `<div class="game-nav" style="padding-left:0;padding-right:0"><select class="cl-game">${gameOpts}</select></div><div class="cl-proto">${protocol(played[played.length - 1].date)}</div>` : '<div class="empty-note">Vēl nav aizvadītu spēļu</div>';
+
+    // ---- Spēlētāju statistika ----
+    const playerView = name => {
+      const p = players.find(x => x.name === name); if (!p) return '';
+      const logRows = played.slice().reverse().map(g => { const pr = g.pr; if (!pr || !pr.players.includes(name)) return '';
+        const G = pr.goals.filter(x => x.side === 'us' && x.scorer === name).length, A = pr.goals.filter(x => x.side === 'us' && (x.a1 === name || x.a2 === name)).length;
+        const pim = pr.penalties.filter(x => x.side === 'us' && x.player === name).reduce((s, x) => s + x.min, 0);
+        return `<tr><td>${dShort(g.date)}</td><td class="name">${g.home ? 'vs' : '@'} ${logoImg(g.logo, g.opp)}${esc(g.opp)}</td><td class="num">${g.us}-${g.them} <span class="r ${g.r}">${g.r}</span></td><td class="num">${G}</td><td class="num">${A}</td><td class="num"><b>${G + A}</b></td><td class="num">${pim}</td></tr>`; }).join('');
+      return `<div class="panel cl-pcard"><div style="display:flex;gap:22px;align-items:center">${imgOrPh(photo(p.ehl), 'cl-photo')}
+          <div style="flex:1"><div style="font-family:Oswald,sans-serif;font-size:30px;font-weight:600">${esc(p.name)}</div>
+            <div style="color:var(--text-dim);margin-top:4px">${p.pos ? `<span class="pos-badge">${POSL[p.pos]}</span>` : ''}${p.nr != null ? ' #' + p.nr : ''}${p.ehl ? ` · <a href="${p.ehl}" target="_blank" rel="noopener">EHL profils →</a>` : ''}</div>
+            <div class="cl-tot" style="margin-top:16px;grid-template-columns:repeat(5,1fr)">${[['GP', p.gp], ['G', p.g], ['A', p.a], ['P', p.p], ['PIM', p.pim]].map(([l, v]) => `<div><b>${nz(v)}</b><span>${l}</span></div>`).join('')}</div></div></div></div>
+        <div class="panel"><h2>Spēles</h2><table class="ovt" style="font-size:14px"><tr><th>Datums</th><th>Pretinieks</th><th class="num">Score</th><th class="num">G</th><th class="num">A</th><th class="num">P</th><th class="num">PIM</th></tr>${logRows || '<tr><td colspan="7" class="empty-note">Nav spēļu</td></tr>'}</table></div>`;
+    };
+    const sortedPl = players.slice().sort((x, y) => x.name.localeCompare(y.name));
+    const playerPane = players.length ? `<div class="game-nav" style="padding-left:0;padding-right:0"><select class="cl-player">${sortedPl.map(p => `<option${p.name === (skaters[0] ? skaters[0].name : sortedPl[0].name) ? ' selected' : ''}>${esc(p.name)}</option>`).join('')}</select></div><div class="cl-pview">${playerView(skaters[0] ? skaters[0].name : sortedPl[0].name)}</div>` : '<div class="empty-note">Nav datu</div>';
+
+    // ---- Komandas statistika ----
+    const winPct = played.length ? Math.round(W / played.length * 1000) / 10 : 0;
+    const gfShare = (GF + GA) ? GF / (GF + GA) * 100 : 50;
+    const maxBar = 1;
+    const wl = played.slice().reverse().map(g => `<div class="wl-item">${g.r === 'L' ? '<div class="wl-bar-half"><span class="wl-bar loss" style="width:100%"></span></div><div class="wl-bar-half"></div>' : '<div class="wl-bar-half"></div><div class="wl-bar-half"><span class="wl-bar win" style="width:100%"></span></div>'}</div>`).join('');
+    const totals = [['Uzbrukums', [['G', GF, (GF / gp).toFixed(1)], ['S', S, (S / gp).toFixed(1)], ['Shot%', pc(S ? GF / S * 100 : null), null]]],
+      ['Aizsardzība', [['GA', GA, (GA / gp).toFixed(1)], ['SA', SA, (SA / gp).toFixed(1)], ['Save%', pc(SA ? (SA - GA) / SA * 100 : null), null]]],
+      ['Disciplīna', [['PIM', PIM, (PIM / gp).toFixed(1)], ['PIM pret', PIMA, (PIMA / gp).toFixed(1)]]]];
+    const teamPane = `<div class="bx-pair ts-pair">
+        <div class="panel"><h2>Bilance</h2><div class="rec2" style="margin-top:14px">
+          <div class="rec-ring" style="background:conic-gradient(var(--win) 0 ${winPct}%, var(--loss) ${winPct}% 100%)"><div><b>${winPct}%</b><span>uzvaras</span></div></div>
+          <div class="rec-side"><div class="rec-top"><div class="rec-gp"><b>${played.length}</b><span>spēles</span></div>
+            <div class="rec-pills"><span class="pill w"><b>${W}</b> W</span><span class="pill l"><b>${L}</b> L</span>${D ? `<span class="pill d"><b>${D}</b> D</span>` : ''}</div></div>
+            <div class="rec-goals"><div class="t"><span>Gūtie <b class="g">${GF}</b></span><span class="df ${GF - GA > 0 ? 'pos' : GF - GA < 0 ? 'neg' : ''}">${sgn(GF - GA)}</span><span><b class="a">${GA}</b> Ielaistie</span></div>
+              <div class="duel"><span class="g" style="width:${gfShare}%"></span><span class="a" style="width:${100 - gfShare}%"></span></div></div></div></div></div>
+        <div class="panel"><h2>Mēs pret pretiniekiem</h2><div class="cl-duels">${duel('Vārti', GF, GA, '')}${duel('Metieni', S, SA, 'sh')}${duel('Soda minūtes', PIM, PIMA, 'fo', true)}</div></div></div>
+      <div class="panel"><h2>Spēles</h2><div class="team-stats-row gamelog-row"><div class="team-wl-col"><div class="wl-header"><span style="color:var(--loss)">Zaudējums</span><span style="color:var(--win)">Uzvara</span></div><div class="wl-list">${wl}</div></div>
+        <div class="team-gamelog-col"><table class="ovt cl-log" style="font-size:13.5px"><tr><th>Datums</th><th>Pretinieks</th><th class="num">G</th><th class="num">GA</th><th class="num">S</th><th class="num">SA</th><th class="num">PIM</th><th class="num">PIM pret</th><th></th></tr>
+          ${played.slice().reverse().map(g => `<tr><td>${g.date}</td><td class="name">${g.home ? 'vs' : '@'} ${logoImg(g.logo, g.opp)}${esc(g.opp)}</td><td class="num">${g.us}</td><td class="num">${g.them}</td><td class="num">${g.s ?? '—'}</td><td class="num">${g.sa ?? '—'}</td><td class="num">${g.pim ?? '—'}</td><td class="num">${g.pimA ?? '—'}</td><td class="num"><a href="#" data-game="${g.date}">Protokols</a></td></tr>`).join('')}</table></div></div></div>
+      <div class="panel" style="max-width:520px"><h2>Sezonas kopsummas un vidējie</h2><table id="clTot-${div}" class="cl-totals"><tr><th></th><th>Kopā</th><th>Vidēji spēlē</th></tr>
+        ${totals.map(([title, rows]) => `<tr class="tt-group"><td colspan="3">${title}</td></tr>` + rows.map(([l, v, av]) => av === null ? `<tr><td>${l}</td><td colspan="2" style="text-align:center"><b>${v}</b></td></tr>` : `<tr><td>${l}</td><td><b>${v}</b></td><td style="color:var(--text-dim)">${av}</td></tr>`).join('')).join('')}</table></div>`;
+
+    // ---- Sastāvs ----
+    const groups = players.some(p => p.pos) ? POS : [[null, 'Spēlētāji']];
+    const rosterPane = groups.map(([k, label]) => { const list = players.filter(p => (p.pos || null) === k).sort((x, y) => (y.gp ?? 0) - (x.gp ?? 0) || x.name.localeCompare(y.name)); if (!list.length) return '';
+      return `<div class="roster-section-title">${label}</div><div class="cl-roster">${list.map(p => `<div class="cl-card">${imgOrPh(photo(p.ehl), 'cl-av')}
+        <div style="min-width:0"><div class="nm">${esc(p.name)} <span style="color:var(--text-faint);font-weight:500">${p.nr != null ? '#' + p.nr : ''}</span></div><div class="mt">${p.pos ? `<span class="pos-badge">${POSL[p.pos]}</span>` : ''}${p.ehl ? ` · <a href="${p.ehl}" target="_blank" rel="noopener">EHL profils →</a>` : ''}</div>
+        <div class="st">${(k === 'G' ? [['GP', p.gp]] : [['GP', p.gp], ['G', p.g], ['A', p.a], ['P', p.p], ['PIM', p.pim]]).map(([l, v]) => `<div><b>${nz(v)}</b><span>${l}</span></div>`).join('')}</div></div></div>`).join('')}</div>`; }).join('');
+
+    view.innerHTML = `<div class="subtabs">${[['ov', 'Pārskats'], ['box', 'Protokols'], ['pl', 'Spēlētāju statistika'], ['team', 'Komandas statistika'], ['roster', 'Sastāvs']]
+        .map(([k, l], i) => `<button class="ctab${i ? '' : ' active'}" data-p="${k}">${l}</button>`).join('')}</div>
+      <div class="wrap">
+        <div class="cpane on" data-p="ov">${overview}</div>
+        <div class="cpane" data-p="box">${protoPane}</div>
+        <div class="cpane" data-p="pl" style="padding-top:16px">${playerPane}</div>
+        <div class="cpane" data-p="team" style="padding-top:20px">${teamPane}</div>
+        <div class="cpane" data-p="roster" style="padding-top:10px">${rosterPane}</div>
+      </div>`;
+    view._protocol = protocol; view._playerView = playerView;
+  }
+  document.querySelectorAll('.club-view').forEach(view => {
+    render(view);
+    const show = k => { view.querySelectorAll('.ctab').forEach(x => x.classList.toggle('active', x.dataset.p === k)); view.querySelectorAll('.cpane').forEach(p => p.classList.toggle('on', p.dataset.p === k)); };
+    view.addEventListener('click', e => {
+      const tb = e.target.closest('.ctab'); if (tb) { show(tb.dataset.p); return; }
+      const gl = e.target.closest('a[data-game]');
+      if (gl) { e.preventDefault(); const sel = view.querySelector('.cl-game'); if (sel) { sel.value = gl.dataset.game; view.querySelector('.cl-proto').innerHTML = view._protocol(sel.value); } show('box'); window.scrollTo(0, 0); return; }
+      const b = e.target.closest('.ov-switch .grp-chips button');
+      if (b) { const box = b.closest('.ov-switch'); box.querySelectorAll('.grp-chips button').forEach(x => x.classList.toggle('on', x === b));
+        box.querySelectorAll('.ov-part').forEach(d => d.style.display = d.dataset.i === b.dataset.i ? '' : 'none'); return; }
+      const m = e.target.closest('[data-more]');
+      if (m) { const open = m.dataset.open !== '1'; m.closest('.panel').querySelectorAll('tr.extra').forEach(r => r.style.display = open ? '' : 'none');
+        m.dataset.open = open ? '1' : '0'; m.textContent = open ? 'Rādīt top 10' : `Rādīt visus ${m.closest('.panel').querySelectorAll('tr').length - 1} spēlētājus`; }
+    });
+    view.addEventListener('change', e => {
+      if (e.target.matches('.cl-game')) view.querySelector('.cl-proto').innerHTML = view._protocol(e.target.value);
+      if (e.target.matches('.cl-player')) view.querySelector('.cl-pview').innerHTML = view._playerView(e.target.value);
+    });
+  });
+})();
+
 // ---------------- Latvian ----------------
 // Everything on the page is translated here in one place, as it is shown. Stat names and
 // abbreviations (G, A, PIM, SOG, Shots on goal, ...) and table column headers stay in English.
 (function(){
   const EXACT = {
-    'Home':'Sākums', 'Ledus Veči stats':'Ledus Veči statistika', 'Calendar':'Kalendārs',
+    'Home':'Sākums', 'Ledus Veči stats':'Ledus Veči statistika', 'Ledus Veči II statistika':'Ledus Veči II statistika', 'Calendar':'Kalendārs',
     'Overview':'Pārskats', 'Grupa':'Grupa', 'Maiņa kopā':'Maiņa kopā', 'Boxscore':'Protokols', 'Player stats':'Spēlētāju statistika', 'Team stats':'Komandas statistika',
     'Roster':'Sastāvs', "How it's calculated":'Kā tiek aprēķināts',
     'HOME':'MĀJĀS', 'AWAY':'IZBRAUKUMĀ', 'LOSS':'ZAUDĒJUMS', 'WIN':'UZVARA', 'Loss':'Zaudējums', 'Win':'Uzvara',
