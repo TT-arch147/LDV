@@ -305,10 +305,26 @@ function parseTeamView(html) {
   return games;
 }
 
-async function fetchTeamView(teamId) {
-  const body = new URLSearchParams({ team: teamId, search: 'search' });
-  const html = await getHtml(CALENDAR_URL + '?_cb=' + Date.now(), { method: 'POST', body });
-  if (!html.includes('team_review')) throw new Error('response did not look like the team-filtered view');
+// the calendar remembers the chosen division in a cookie; without it the team filter can come back empty,
+// so if the first try fails, switch to the team's division first and try again with that cookie
+async function divisionCookie(divisionId) {
+  try {
+    const sw = await fetch(`${EHL}/switch/division/${divisionId}`, { headers: BROWSER_HEADERS, redirect: 'manual' });
+    const all = (sw.headers.getSetCookie ? sw.headers.getSetCookie() : [sw.headers.get('set-cookie') || '']).filter(Boolean);
+    return all.map(c => c.split(';')[0]).join('; ');
+  } catch (e) { return ''; }
+}
+async function fetchTeamView(teamId, divisionId) {
+  const body = () => new URLSearchParams({ team: teamId, search: 'search' });
+  let html = await getHtml(CALENDAR_URL + '?_cb=' + Date.now(), { method: 'POST', body: body() });
+  if (!html.includes('team_review') && divisionId) {
+    const cookie = await divisionCookie(divisionId);
+    html = await getHtml(CALENDAR_URL + '?_cb=' + Date.now(), { method: 'POST', body: body(), headers: { ...BROWSER_HEADERS, ...(cookie ? { Cookie: cookie } : {}) } });
+  }
+  if (!html.includes('team_review')) {
+    console.log(`team view ${teamId}: page start:`, html.replace(/\s+/g, ' ').slice(0, 300));
+    throw new Error('response did not look like the team-filtered view');
+  }
   const games = parseTeamView(html);
   if (!games.length) {
     const i = html.indexOf('<tr class="div_');
@@ -343,7 +359,7 @@ async function fetchClubTeams(previous) {
     const id = byName(t.name) || prev[t.div]?.id || t.fallbackId;
     if (!id) { console.error(`club ${t.div}: team id not found (no "${t.name}" in the dropdown) - keeping previous`); if (prev[t.div]) out[t.div] = prev[t.div]; continue; }
     try {
-      const games = await fetchTeamView(id);
+      const games = await fetchTeamView(id, t.divisionId);
       const abbr = mostCommonAbbr(games);
       const today = new Date().toISOString().slice(0, 10);
       const next = games.filter(g => !g.played && g.date && g.date >= today).sort((a, b) => a.date < b.date ? -1 : 1)[0];
@@ -352,7 +368,7 @@ async function fetchClubTeams(previous) {
         const opp = next.home.abbr === abbr ? next.away : next.home;
         const oppName = (opp.id && dir[opp.id]) ? niceName(dir[opp.id]) : (TEAM_ABBR[opp.abbr] || opp.abbr);
         let oppGames = [];
-        if (opp.id) { try { oppGames = (await fetchTeamView(opp.id)).filter(g => g.played); } catch (e) { console.error(`club ${t.div}: opponent view failed:`, e.message); } }
+        if (opp.id) { try { oppGames = (await fetchTeamView(opp.id, t.divisionId)).filter(g => g.played); } catch (e) { console.error(`club ${t.div}: opponent view failed:`, e.message); } }
         opponent = { id: opp.id, abbr: opp.abbr, name: oppName, games: oppGames };
       }
       // names for every team id seen, so the page can show full names instead of abbreviations

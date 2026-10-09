@@ -879,6 +879,13 @@ footer{text-align:center;color:var(--text-faint);font-size:12px;padding:20px;}
 #leagueSwitchBox .league-table thead th.sort-on{color:#D04BAE;}
 #leagueSwitchBox .league-table thead th::after{content:attr(data-arrow);font-size:9px;margin-left:3px;}
 #leagueSwitchBox.sorted .league-table tr.playoff-cutoff td{border-bottom:1px solid var(--line);}
+
+/* calendar: no side lists, full width */
+#calendarView .cal-side{display:none;}
+#calendarView .cal-layout{grid-template-columns:1fr;}
+/* home: result badge in the last-meeting line centred on the text */
+.match-foot span{display:inline-flex;align-items:center;flex-wrap:wrap;gap:4px;}
+.match-foot .home-res{margin-left:4px;vertical-align:middle;line-height:1.4;}
 </style>
 </head>
 <body>

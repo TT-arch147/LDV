@@ -1393,6 +1393,7 @@ renderStatsTab();
 // games (played + upcoming), practices, birthdays and name days in one month view
 (function(){
   // the regular weekly practice; extra or cancelled practices come from the Practices sheet tab
+  const USE_WEEKLY_SLOT = false;   // practices now all come from the "Practice" sheet tab
   const PRACTICE = { weekday: 1, time: '21:15', rink: 'Akropole', seasonStart: '09-01', seasonEnd: '04-30' };   // weekday 1 = Monday
   const SHOW_AGE = false;   // true = show the age a player is turning on their birthday
   const TYPES = { E5: 'E5', E7: 'E7', E9: 'E9', practice: 'Practices', bday: 'Birthdays', nday: 'Name days' };
@@ -1452,7 +1453,7 @@ renderStatsTab();
   const extras = DATA.practiceExtras || [];
   const cancelled = new Set(extras.filter(x => x.cancelled).map(x => x.date));
   extras.filter(x => !x.cancelled).forEach(x => fixed.push({ date: x.date, type: 'practice', sub: [x.time, x.rink].filter(Boolean).join(' · '),
-    short: 'Extra practice', text: ['Extra practice', x.time, x.rink, x.note].filter(Boolean).join(' · ') }));
+    short: 'Practice', text: ['Practice', x.time, x.rink, x.note].filter(Boolean).join(' · ') }));
 
   function inSeason(md){
     const s = PRACTICE.seasonStart, e = PRACTICE.seasonEnd;
@@ -1462,7 +1463,7 @@ renderStatsTab();
   function eventsOn(ds){
     const [y, m, d] = ds.split('-').map(Number), md = ds.slice(5);
     const out = fixed.filter(e => e.date === ds);
-    if (new Date(y, m - 1, d).getDay() === PRACTICE.weekday && inSeason(md) && !cancelled.has(ds))
+    if (USE_WEEKLY_SLOT && new Date(y, m - 1, d).getDay() === PRACTICE.weekday && inSeason(md) && !cancelled.has(ds))
       out.push({ type: 'practice', sub: `${PRACTICE.time} · ${PRACTICE.rink}`, short: 'Practice', text: `Practice ${PRACTICE.time} · ${PRACTICE.rink}` });
     Object.entries(DATA.birthdays || {}).forEach(([n, b]) => {
       if (rosterNames.has(n) && b && b.slice(5) === md)
@@ -1743,7 +1744,7 @@ renderStatsTab();
     for (let i = 0; i < 7; i++) {
       const d = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i), ds = isoOf(d), md = ds.slice(5);
       let ev;
-      if (t.div === 'E5') ev = window.calEventsOn ? window.calEventsOn(ds) : [];
+      if (t.div === 'E5') ev = (window.calEventsOn ? window.calEventsOn(ds) : []).filter(e => e.type !== 'game' || e.div === 'E5');
       else {
         ev = (window.calEventsOn ? window.calEventsOn(ds) : []).filter(e => e.type === 'practice');
         (t.ehlUpcoming || []).filter(g => g.date === ds).forEach(g => { const p = ehlPersp(g, CLUB[t.div].abbr, CLUB[t.div].names || {});
