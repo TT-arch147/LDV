@@ -194,6 +194,39 @@ function parseLeagueTable(html) {
 }
 
 
+
+// players not looked up yet are fetched - one at a time, to go easy on the EHL site.
+async function fetchBirthdays(roster, previous) {
+  const out = { ...(previous || {}) };
+  const todo = roster.filter(p => p.ehl && !out[p.name]);
+  let added = 0, missed = 0;
+  for (const p of todo) {
+    const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 10000);
+    try {
+      const res = await fetch(p.ehl, { headers: BROWSER_HEADERS, signal: ctl.signal });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const html = await res.text();
+      const m = html.match(/Dzim\S*\s+dati[\s\S]{0,300}?(\d{1,2})\.(\d{1,2})\.(\d{4})/i);
+      if (m) { out[p.name] = `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`; added++; } else missed++;
+    } catch (err) { missed++; }
+    finally { clearTimeout(timer); }
+  }
+  console.log(`birthdays: ${Object.keys(out).length} known, ${added} new, ${missed} not found this run`);
+  return out;
+}
+
+// name days from the official Latvian list (namedays.json, name -> "MM-DD"); names that aren't
+// in it get 22 May, the day for uncommon names
+function buildNameDays(roster) {
+  const list = JSON.parse(fs.readFileSync(path.join(__dirname, 'namedays.json'), 'utf8'));
+  const out = {};
+  for (const p of roster) {
+    const first = p.name.split(' ')[0];
+    out[p.name] = list[first] ? { d: list[first] } : { d: '05-22', special: true };
+  }
+  return out;
+}
+
 // ---------- E5 team stats (GF, GA, PP%, PK% ... for the E5 table) ----------
 // The league's "Statistika > Komandas" page, regular season, for one division.
 async function fetchTeamStats(previous, divisionId = '400', label = 'E5') {
@@ -284,6 +317,99 @@ async function capturePageSamples(club) {
   return out;
 }
 
+// ---------- E7 table: the E7 standings page is a "cross table" (every team against every team) ----------
+function parseCrossTable(html, divisionId) {
+  const k = html.indexOf(`standings-table division-${divisionId}`); if (k < 0) return null;
+  const t = html.slice(k, html.indexOf('</table>', k));
+  const teams = [];
+  for (const row of t.matchAll(/<tr>([\s\S]*?)<\/tr>/g)) {
+    const nm = row[1].match(/teams_name">([^<]+)</); if (!nm) continue;
+    const tds = [...row[1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)].map(m => m[1].replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim());
+    teams.push({ team: nm[1].trim(), gp: parseInt(tds[1]) || 0, points: parseInt(tds[tds.length - 1]) || 0 });
+  }
+  return teams.length ? teams : null;
+}
+// protocol links of every played game in the cross table: { protocolId: [clubIdA, clubIdB] }
+function crossTableProtocols(html) {
+  const out = {};
+  for (const m of html.matchAll(/data-teams_id="(\d+)-(\d+)"><a href="\/protokols\/(\d+)"/g)) out[m[3]] = [m[1], m[2]];
+  return out;
+}
+
+// ---------- game protocols (E7 / E9): goals, assists, penalties, shots, faceoffs, goalies, players ----------
+const LV_MONTH_FULL = { 'janvāris':1,'februāris':2,'marts':3,'aprīlis':4,'maijs':5,'jūnijs':6,'jūlijs':7,'augusts':8,'septembris':9,'oktobris':10,'novembris':11,'decembris':12 };
+const fixCase = n => String(n || '').trim().split(/\s+/).map(w => /^[IVX]+$/.test(w) ? w : (w.length > 1 && w === w.toUpperCase() ? w[0] + w.slice(1).toLowerCase() : w)).join(' ');
+const pidOf = href => (String(href).match(/\/personas\/[a-z0-9-]+\/(\d+)/) || [])[1] || null;
+function parseProtocol(html, url, ourClubId) {
+  const strip = s => String(s).replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+  const dm = html.match(/<div class="date">\s*(\d{1,2})\.\s*([A-ZĀČĒĢĪĶĻŅŠŪŽa-zāčēģīķļņšūž]+),\s*(\d{4})/);
+  if (!dm) return null;
+  const month = LV_MONTH_FULL[dm[2].toLowerCase()]; if (!month) return null;
+  const date = `${dm[3]}-${String(month).padStart(2, '0')}-${dm[1].padStart(2, '0')}`;
+  const place = (html.match(/<div class="place">([\s\S]*?)<\/div>/) || [])[1] || '';
+  const pl = place.split(/<br\s*\/?>/i).map(strip);
+  const arenaTime = (pl[1] || '').match(/^(.*?),\s*(\d{1,2}:\d{2})/) || [];
+  const sideIds = [...html.matchAll(/<div class="team_data( team_b)?">[\s\S]*?\/komandas\/[^"\/]+\/(\d+)/g)].map(m => m[2]);
+  const abbrs = [...html.matchAll(/<div class="team_name">\s*<div class="name">([^<]+)<\/div>/g)].map(m => m[1].trim());
+  const sa = html.match(/id="score_a">(\d+)</), sb = html.match(/id="score_b">(\d+)</);
+  const num = id => +((html.match(new RegExp(`id="${id}">(\\d+)<`)) || [])[1] || 0);
+  if (sideIds.length < 2 || abbrs.length < 2) return null;
+  const weHome = sideIds[0] === String(ourClubId), weAway = sideIds[1] === String(ourClubId);
+  if (!weHome && !weAway) return null;
+  const usAbbr = weHome ? abbrs[0] : abbrs[1], themAbbr = weHome ? abbrs[1] : abbrs[0];
+  const g = { date, protocol: url, time: arenaTime[2] || null, arena: arenaTime[1] || null,
+    home: { abbr: abbrs[0], id: sideIds[0], name: fixCase((pl[0] || '').split(' vs ')[0]) },
+    away: { abbr: abbrs[1], id: sideIds[1], name: fixCase((pl[0] || '').split(' vs ')[1]) },
+    played: !!(sa && sb), hg: sa ? +sa[1] : null, ag: sb ? +sb[1] : null,
+    video: (html.match(/href="(https:\/\/www\.youtube\.com\/embed\/[^"]+)"[^>]*class="video"/) || [])[1] || null,
+    shots: { us: weHome ? num('stats_sog_a') : num('stats_sog_b'), them: weHome ? num('stats_sog_b') : num('stats_sog_a') },
+    faceoffs: { us: weHome ? num('stats_foff_a') : num('stats_foff_b'), them: weHome ? num('stats_foff_b') : num('stats_foff_a') },
+    goals: [], penalties: [], goalies: [], players: [] };
+  // events, period by period
+  let period = 1;
+  for (const blk of html.matchAll(/<span class="title">([^<]+)<\/span>[\s\S]*?<tbody>([\s\S]*?)<\/tbody>/g)) {
+    const pm = blk[1].match(/(\d)\./); period = pm ? +pm[1] : (/papild/i.test(blk[1]) ? 4 : period);
+    for (const ev of blk[2].matchAll(/<tr class="([^"]+)">([\s\S]*?)<\/tr>/g)) {
+      const cells = [...ev[2].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)].map(c => c[1]);
+      if (cells.length < 4) continue;
+      const time = strip(cells[0]), team = strip(cells[1]), type = strip(cells[2]), side = team === usAbbr ? 'us' : 'them';
+      const people = [...cells[3].matchAll(/#(\d+)\s*<a href="([^"]+)">([^<]+)<\/a>/g)].map(m => ({ nr: +m[1], pid: pidOf(m[2]), name: fixCase(m[3]) }));
+      if (/goal/.test(ev[1])) {
+        g.goals.push({ side, period, time, type: (type.match(/\(([A-Z]+)\)/) || [])[1] || '', pp: /\(PP/.test(type),
+          scorer: people[0] ? people[0].name : null, a1: people[1] ? people[1].name : null, a2: people[2] ? people[2].name : null, video: null });
+      } else if (/penalty/.test(ev[1])) {
+        const pen = strip(cells[3]).match(/-\s*(.*?)\s*\((\d+)\s*min\)/);
+        g.penalties.push({ side, period, time, player: people[0] ? people[0].name : null, min: pen ? +pen[2] : 2, reason: pen ? pen[1] : '' });
+      } else if (/gk_in|gk_out/.test(ev[1]) && side === 'us' && people[0]) {
+        g.goalies.push({ name: people[0].name, ev: /gk_in/.test(ev[1]) ? 'in' : 'out', time });
+      }
+    }
+  }
+  // our players' stats table (number, position, G, A, P, PIM)
+  for (const tb of html.matchAll(/<table class="protocol-stats"><thead><tr><th[^>]*>#<\/th><th class="img-inlcuded"><a href="\/komandas\/[^"\/]+\/(\d+)"[\s\S]*?<tbody>([\s\S]*?)<\/tbody>/g)) {
+    if (tb[1] !== String(ourClubId)) continue;
+    for (const row of tb[2].matchAll(/<tr>([\s\S]*?)<\/tr>/g)) {
+      const c = [...row[1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)].map(x => x[1]);
+      const a = c[1] && c[1].match(/<a href="([^"]+)">([^<]+)<\/a>/); if (!a) continue;
+      g.players.push({ nr: +strip(c[0]) || null, name: fixCase(a[2]), pid: pidOf(a[1]), ehl: 'https://ehl.entuziasti.com' + a[1],
+        pos: ({ F: 'F', D: 'D', GK: 'G' })[strip(c[2])] || null, g: +strip(c[3]) || 0, a: +strip(c[4]) || 0, pim: +strip(c[6]) || 0 });
+    }
+  }
+  // our goalie(s): shots and goals against while each was in net
+  const tSec = s => { const [m, ss] = String(s).split(':').map(Number); return m * 60 + (ss || 0); };
+  const ins = g.goalies.filter(x => x.ev === 'in');
+  const stints = ins.map(x => { const out = g.goalies.find(y => y.ev === 'out' && y.name === x.name && tSec(y.time) >= tSec(x.time));
+    return { name: x.name, from: tSec(x.time), to: out ? tSec(out.time) : 99999 }; });
+  const totalTime = stints.reduce((s, x) => s + Math.max(0, Math.min(x.to, 3600) - x.from), 0) || 1;
+  g.goalie = stints.length ? stints.map(x => ({ name: x.name,
+    ga: g.goals.filter(q => q.side === 'them' && tSec(q.time) >= x.from && tSec(q.time) <= x.to).length,
+    sa: Math.round(g.shots.them * Math.max(0, Math.min(x.to, 3600) - x.from) / totalTime) }))
+    .sort((p, q) => q.sa - p.sa)[0] : null;
+  g.goalieList = stints.length > 1 ? stints : undefined;
+  delete g.goalies;
+  return g;
+}
+
 // ---------- Home page: all three club teams (E5, E7, E9) from the EHL calendar ----------
 // Each team's own calendar view (the same POST the E5 code above uses) lists its played games
 // with scores and protocol links, and its upcoming games. The same view for the next opponent
@@ -291,7 +417,7 @@ async function capturePageSamples(club) {
 // team dropdown, so nothing has to be typed in by hand; the fallbacks below are used if that fails.
 const CLUB_TEAMS = [
   { div: 'E5', name: 'Ledus Veči',     slug: 'ledus-veci',     fallbackId: '293', divisionId: '400' },
-  { div: 'E7', name: 'Ledus Veči II',  slug: 'ledus-veci-ii',  fallbackId: null,  divisionId: '402' },
+  { div: 'E7', name: 'Ledus Veči II',  slug: 'ledus-veci-ii',  fallbackId: '334', divisionId: '402' },
   { div: 'E9', name: 'Ledus Veči III', slug: 'ledus-veci-iii', fallbackId: '527', divisionId: '404' },
 ];
 const EHL = 'https://ehl.entuziasti.com';
@@ -416,7 +542,7 @@ async function fetchClubTeams(previous) {
   const byName = n => Object.keys(dir).find(id => plain(dir[id]) === plain(n));
   const out = {};
   for (const t of CLUB_TEAMS) {
-    const id = byName(t.name) || prev[t.div]?.id || t.fallbackId;
+    const id = t.fallbackId || prev[t.div]?.id || byName(t.name);   // club id (the dropdown now lists season ids)
     if (!id) { console.error(`club ${t.div}: team id not found (no "${t.name}" in the dropdown) - keeping previous`); if (prev[t.div]) out[t.div] = prev[t.div]; continue; }
     try {
       const games = await fetchTeamView(id, t.divisionId);
@@ -584,7 +710,15 @@ async function fetchPracticeExtras(previous) {
 
   // home page: E7 / E9 tables, all three teams' games and opponents, E7 / E9 players
   const leagueTables = { ...(STATIC.leagueTables || {}), E5: leagueTable };
+  const crossHtml = {};
   for (const t of CLUB_TEAMS.filter(t => t.div !== 'E5')) {
+    try {
+      const cookie = await divisionCookie(t.divisionId);
+      const html = await getHtml(`${EHL}/statistika/tabula?_cb=${Date.now()}`, { headers: { ...BROWSER_HEADERS, ...(cookie ? { Cookie: cookie } : {}) } });
+      crossHtml[t.div] = html;
+      const cross = !/standings-table-teams/.test(html) ? null : parseCrossTable(html, t.divisionId);
+      if (cross) { leagueTables[t.div] = { divisions: [{ division: t.div, teams: cross }], fetchedAt: new Date().toISOString() }; console.log(`league table ${t.div}: ${cross.length} teams (cross table)`); continue; }
+    } catch (e) { console.error(`league table ${t.div} (cross table):`, e.message); }
     try { leagueTables[t.div] = await fetchLeagueTable(leagueTables[t.div], t.divisionId, t.div); }
     catch (err) { console.error(`league table ${t.div}: unexpected error, keeping previous value:`, err.message); }
   }
@@ -616,13 +750,54 @@ async function fetchPracticeExtras(previous) {
   for (const [div, id] of [['E7', '402'], ['E9', '404']]) {
     try { clubTeamStats[div] = await fetchTeamStats(clubTeamStats[div], id, div); } catch (err) { console.error(`team stats ${div}:`, err.message); }
   }
+  // E7 / E9 protocols. Which games: the protocol links in the team calendar (club) and in the cross table.
+  // A protocol is read again while its game is recent (corrections) or not finished; older ones are kept.
+  const OUR_CLUB = { E7: '334', E9: '527' };
+  const clubGames = { ...(STATIC.clubGames || {}) }, clubPlayers = { ...(STATIC.clubPlayers || {}) };
+  for (const div of ['E7', 'E9']) {
+    try {
+      const known = {}; (clubGames[div] || []).forEach(gm => known[gm.protocol] = gm);
+      const urls = new Set();
+      ((club && club[div] && club[div].games) || []).forEach(gm => { if (gm.protocol) urls.add(gm.protocol); });
+      Object.entries(crossTableProtocols(crossHtml[div] || '')).forEach(([pid, ids]) => { if (ids.includes(OUR_CLUB[div])) urls.add(`${EHL}/protokols/${pid}`); });
+      const todayIso = new Date().toISOString().slice(0, 10), weekAgo = new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10);
+      let read = 0;
+      for (const url of urls) {
+        const old = known[url];
+        if (old && old.played && old.date < weekAgo) continue;          // finished and settled
+        if (old && !old.played && old.date > todayIso) continue;        // still in the future
+        try { const gm = parseProtocol(await getHtml(url), url, OUR_CLUB[div]); if (gm) { known[url] = gm; read++; } } catch (e) { /* keep the old copy */ }
+      }
+      clubGames[div] = Object.values(known).filter(gm => gm && gm.date).sort((a, b) => a.date < b.date ? -1 : 1);
+      // player totals from the protocols (games played, goals, assists, penalty minutes, last number and position)
+      const tot = {};
+      clubGames[div].filter(gm => gm.played).forEach(gm => gm.players.forEach(p => {
+        const k = p.pid || p.name, t = tot[k] || (tot[k] = { name: p.name, ehl: p.ehl, pos: p.pos, nr: p.nr, gp: 0, g: 0, a: 0, pim: 0 });
+        t.gp++; t.g += p.g; t.a += p.a; t.pim += p.pim; t.nr = p.nr ?? t.nr; t.pos = p.pos || t.pos; }));
+      clubPlayers[div] = Object.values(tot);
+      // results and games from the protocols, so scores stay current even when the team calendar can't be read
+      if (club && club[div]) {
+        const byProt = {}; (club[div].games || []).forEach(gm => { if (gm.protocol) byProt[gm.protocol] = gm; });
+        clubGames[div].forEach(gm => {
+          const row = byProt[gm.protocol] || {};
+          Object.assign(row, { date: gm.date, time: gm.time || row.time, arena: gm.arena || row.arena, home: { ...(row.home || {}), abbr: gm.home.abbr, id: gm.home.id },
+            away: { ...(row.away || {}), abbr: gm.away.abbr, id: gm.away.id }, played: gm.played, hg: gm.hg, ag: gm.ag, protocol: gm.protocol });
+          if (!byProt[gm.protocol]) club[div].games.push(row);
+          club[div].names = club[div].names || {};
+          if (gm.home.name) club[div].names[gm.home.abbr] = club[div].names[gm.home.abbr] || gm.home.name;
+          if (gm.away.name) club[div].names[gm.away.abbr] = club[div].names[gm.away.abbr] || gm.away.name;
+        });
+      }
+      console.log(`protocols ${div}: ${read} read this run, ${clubGames[div].length} games, ${clubPlayers[div].length} players`);
+    } catch (err) { console.error(`protocols ${div} failed, keeping previous:`, err.message); }
+  }
   let pageSamples = STATIC.pageSamples;
   try { pageSamples = await capturePageSamples(club); } catch (err) { console.error('page samples failed:', err.message); }
   const fullE5 = fromClub(club);
   if (fullE5) { upcomingGames = fullE5; console.log(`upcoming E5: ${fullE5.length} games from the team calendar`); }
 
   const updated = { ...STATIC, boxscores, skaterRows, goalieRows, roster: finalRoster,
-                     leagueTable, leagueTables, leagueStats, clubTeamStats, club, pageSamples, runLog: RUN_LOG.slice(-400), teamRosters, upcomingGames, birthdays, nameDays, practiceExtras, lastRefreshed: new Date().toISOString() };
+                     leagueTable, leagueTables, leagueStats, clubTeamStats, clubGames, clubPlayers, club, pageSamples, runLog: RUN_LOG.slice(-400), teamRosters, upcomingGames, birthdays, nameDays, practiceExtras, lastRefreshed: new Date().toISOString() };
   fs.writeFileSync(file, JSON.stringify(updated) + '\n');
   console.log(`updated static-data.json: ${boxscores.length} games, latest ${boxscores[boxscores.length - 1].date}`);
 })().catch(err => { console.error('refresh failed, static-data.json left unchanged:', err.message); process.exit(1); });

@@ -2175,9 +2175,10 @@ document.getElementById('statsTeamSelect') && document.getElementById('statsTeam
               <div style="font-family:Oswald,sans-serif;font-size:56px;font-weight:700;margin:0 24px">${L.goals} <span style="color:var(--text-faint)">-</span> ${Rt.goals}</div>
               <div class="sb-team" style="text-align:center">${bigLogo(Rt.logo, Rt.name)}<div class="sb-team-name" style="font-family:Oswald,sans-serif;font-size:22px;font-weight:600;margin-top:8px">${esc(Rt.name).toUpperCase()}</div></div></div>
             <div style="text-align:center;margin-top:14px"><span class="result-badge ${g.r}" style="font-family:Oswald,sans-serif;font-weight:600;padding:4px 14px;border-radius:999px;background:${g.r === 'W' ? 'rgba(76,201,142,.15);color:var(--win)' : 'rgba(225,90,90,.15);color:var(--loss)'}">${g.r === 'W' ? 'UZVARA' : g.r === 'L' ? 'ZAUDĒJUMS' : 'NEIZŠĶIRTS'}</span></div>
-            ${g.link ? `<div style="text-align:center;margin-top:12px"><a href="${g.link}" target="_blank" rel="noopener">EHL protokols →</a></div>` : ''}</div>
+            <div style="text-align:center;margin-top:12px;display:flex;gap:18px;justify-content:center">${pr && pr.video ? `<a href="${pr.video.replace('/embed/', '/watch?v=')}" target="_blank" rel="noopener">▶ Spēles video</a>` : ''}${g.link ? `<a href="${g.link}" target="_blank" rel="noopener">EHL protokols →</a>` : ''}</div></div>
           <div class="panel bx-stats"><h2>Spēles statistika</h2>${pr ? [bar('Metieni vārtos', L.s === 'us' ? pr.shots.us : pr.shots.them, L.s === 'us' ? pr.shots.them : pr.shots.us),
-              bar('Soda minūtes', L.s === 'us' ? g.pim : g.pimA, L.s === 'us' ? g.pimA : g.pim)].join('') +
+              bar('Soda minūtes', L.s === 'us' ? g.pim : g.pimA, L.s === 'us' ? g.pimA : g.pim),
+              pr.faceoffs && (pr.faceoffs.us || pr.faceoffs.them) ? bar('Uzvarētie iemetieni', L.s === 'us' ? pr.faceoffs.us : pr.faceoffs.them, L.s === 'us' ? pr.faceoffs.them : pr.faceoffs.us) : ''].join('') +
               (pr.goalie ? `<div class="gk-line">Vārtsargs: <b>${esc(pr.goalie.name)}</b> · ${pr.goalie.sa - pr.goalie.ga}/${pr.goalie.sa} · ${pc((pr.goalie.sa - pr.goalie.ga) / pr.goalie.sa * 100)}</div>` : '') : '<div class="empty-note">Protokols vēl nav ielādēts</div>'}</div></div>
         <div class="bx-pair"><div class="panel"><h2>Vārti</h2><div class="goal-cols"><div><div class="goal-col-title">${logoImg(L.logo, L.name)}<span>${esc(L.name).toUpperCase()}</span></div>${goalsOf(L.s)}</div>
             <div><div class="goal-col-title">${logoImg(Rt.logo, Rt.name)}<span>${esc(Rt.name).toUpperCase()}</span></div>${goalsOf(Rt.s)}</div></div></div>
@@ -2196,13 +2197,13 @@ document.getElementById('statsTeamSelect') && document.getElementById('statsTeam
       const gamesFor = played.filter(g => inSeason(g.date, opts.season) && (!opts.hlOnly || (g.pr && hasVideo(g.pr))));
       let p = p0;
       if (played.some(g => g.pr)) {   // totals for the chosen season / filter, counted from the protocols
-        const mine = gamesFor.filter(g => g.pr && g.pr.players.includes(name));
+        const mine = gamesFor.filter(g => g.pr && g.pr.players.some(x => (x.name || x) === name));
         const G = mine.reduce((s, g) => s + g.pr.goals.filter(x => x.side === 'us' && x.scorer === name).length, 0);
         const A = mine.reduce((s, g) => s + g.pr.goals.filter(x => x.side === 'us' && (x.a1 === name || x.a2 === name)).length, 0);
         const PIMp = mine.reduce((s, g) => s + g.pr.penalties.filter(x => x.side === 'us' && x.player === name).reduce((t, x) => t + x.min, 0), 0);
         p = { ...p0, gp: mine.length, g: G, a: A, p: G + A, pim: PIMp };
       }
-      const logRows = gamesFor.slice().reverse().map(g => { const pr = g.pr; if (!pr || !pr.players.includes(name)) return '';
+      const logRows = gamesFor.slice().reverse().map(g => { const pr = g.pr; if (!pr || !pr.players.some(x => (x.name || x) === name)) return '';
         const G = pr.goals.filter(x => x.side === 'us' && x.scorer === name).length, A = pr.goals.filter(x => x.side === 'us' && (x.a1 === name || x.a2 === name)).length;
         const pim = pr.penalties.filter(x => x.side === 'us' && x.player === name).reduce((s, x) => s + x.min, 0);
         return `<tr><td>${dShort(g.date)}</td><td class="name">${g.home ? 'vs' : '@'} ${logoImg(g.logo, g.opp)}${esc(g.opp)}</td><td class="num">${g.us}-${g.them} <span class="r ${g.r}">${g.r}</span></td><td class="num">${G}</td><td class="num">${A}</td><td class="num"><b>${G + A}</b></td><td class="num">${pim}</td></tr>`; }).join('');
