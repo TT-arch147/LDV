@@ -446,9 +446,10 @@ async function fetchClubLineups(previous) {
     const slotKey = k => { const m = String(k).replace(/\s+/g, '').toUpperCase().match(/^([123])[-_.]?(LW|C|RW|LD|RD)$/); return m ? `${m[1]} ${m[2]}` : /^(GK|V[ĀA]RTSARGS)$/i.test(String(k).trim()) ? 'GK' : null; };
     for (const row of rows) {
       const keys = Object.keys(row), get = re => { const k = keys.find(x => re.test(String(x).trim())); return k ? String(row[k] || '').trim() : ''; };
-      const dm = get(/^datums$|^date$/i).match(/^(\d{1,2})[./](\d{1,2})[./](\d{4})$/) || get(/^datums$|^date$/i).match(/^(\d{4})-(\d{2})-(\d{2})$/);
-      if (!dm) continue;
-      const date = dm[3].length === 4 ? `${dm[3]}-${dm[2].padStart(2, '0')}-${dm[1].padStart(2, '0')}` : `${dm[1]}-${dm[2]}-${dm[3]}`;
+      // dates like "2026 09 09", "2026-09-09", "09.09.2026" or "9/9/2026"
+      const dv = get(/^datums$|^date$/i), ymd = dv.match(/^(\d{4})[\s./-]+(\d{1,2})[\s./-]+(\d{1,2})$/), dmy = dv.match(/^(\d{1,2})[\s./-]+(\d{1,2})[\s./-]+(\d{4})$/);
+      if (!ymd && !dmy) continue;
+      const date = ymd ? `${ymd[1]}-${ymd[2].padStart(2, '0')}-${ymd[3].padStart(2, '0')}` : `${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`;
       const team = get(/^komanda$|^team$/i).toUpperCase();
       const div = /E9|III/.test(team) ? 'E9' : /E7|II/.test(team) ? 'E7' : null;
       if (!div) continue;
