@@ -1106,6 +1106,17 @@ footer{text-align:center;color:var(--text-faint);font-size:12px;padding:20px;}
 .cl-table-next h2{margin-bottom:14px;}
 .cl-table-next .calendar-row{display:flex;flex-direction:column;align-items:flex-start;gap:8px;padding:12px 0;border-bottom:1px solid var(--line);}
 .cl-table-next .calendar-when{text-align:left;}
+
+/* head-to-head popup: not affected by the footer's inline layout */
+.match-foot .h2h-hover{display:inline-block;}
+.match-foot .h2h-pop{display:none;position:absolute;left:0;bottom:calc(100% + 10px);width:max-content;min-width:330px;}
+.match-foot .h2h-hover:hover .h2h-pop{display:block;}
+.match-foot .h2h-pop .h2h-title{display:block;}
+.match-foot .h2h-pop .h2h-row{display:grid;grid-template-columns:96px 1fr 44px 26px 30px;align-items:center;gap:8px;}
+.match-foot .h2h-pop .h2h-row>span{display:block;}
+.match-foot .h2h-pop .h2h-row .s{text-align:right;}
+.match-foot .h2h-pop .h2h-row .home-res{display:inline-block;text-align:center;margin:0;}
+.match-foot .h2h-pop .h2h-row .ot-tag{display:inline-block;margin:0;justify-self:start;width:auto;}
 </style>
 </head>
 <body>

@@ -875,6 +875,7 @@ const teamSelectHtml = (name, ehl, current) => { let teams = playerTeams(name, e
 function decidedBy(b){
   const ot = b && b.periods && b.periods.OT;
   if (!ot || ot.s == null && ot.sa == null && ot.g == null && ot.ga == null) return '';
+  if (/playoff/i.test(b.season || '')) return 'SO';   // playoff games have no overtime result - only a shootout
   return (ot.g || 0) + (ot.ga || 0) > 0 ? 'OT' : 'SO';
 }
 const otTag = d => d ? ` <span class="ot-tag" title="${d === 'OT' ? 'papildlaikā' : 'pēcspēles metienos'}">${d}</span>` : '';
