@@ -1033,6 +1033,23 @@ footer{text-align:center;color:var(--text-faint);font-size:12px;padding:20px;}
 .h2h-row{display:flex;align-items:center;gap:10px;padding:5px 0;border-top:1px solid var(--line);font-size:13px;white-space:nowrap;}
 .h2h-row .d{color:var(--text-dim);min-width:84px;} .h2h-row .o{flex:1;color:var(--text);} .h2h-row .s{font-weight:700;color:var(--text);}
 .h2h-row .home-res{margin-left:0;vertical-align:0;}
+
+/* Protokols: periods drawn like Pa periodiem on Komandas statistika */
+#periodTable thead{display:none;}
+#periodTable tr.pr td{border-bottom:1px solid var(--line);padding:12px 6px;}
+#periodTable tr.pr:last-child td{border-bottom:none;}
+#periodTable td.pn{font-family:'Oswald',sans-serif;font-size:22px;font-weight:600;width:44px;text-align:left;color:var(--text-dim);}
+/* II / III player card + game list: same look as Ledus Veči */
+.club-view .player-card .card-top-row{align-items:flex-start;}
+.cl-filter{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px;}
+.cl-filter select{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:9px 12px;font:500 13.5px 'Inter',sans-serif;}
+.club-view .cl-gl td,.club-view .cl-gl th{text-align:center;padding:8px 10px;}
+.club-view .cl-gl td:nth-child(1),.club-view .cl-gl td:nth-child(2),.club-view .cl-gl th:nth-child(1),.club-view .cl-gl th:nth-child(2){text-align:left;}
+.club-view .cl-gl th{font-size:12.5px;color:var(--text-dim);font-weight:600;border-bottom:1px solid var(--line);}
+.club-view .cl-gl td{border-bottom:1px solid var(--line);font-size:14px;}
+.club-view .cl-gl .hl-mark{color:var(--cyan);font-size:11px;margin-left:6px;}
+.mvp-line{text-align:center;margin-top:12px;font-size:13.5px;color:var(--text-dim);}
+.mvp-line b{color:var(--text);}
 </style>
 </head>
 <body>
@@ -1116,7 +1133,7 @@ footer{text-align:center;color:var(--text-faint);font-size:12px;padding:20px;}
     </div>
 
     <div class="panel">
-      <h2>Shots &amp; faceoffs by period</h2>
+      <h2>Pa periodiem</h2>
       <div class="table-scroll">
         <table id="periodTable">
           <thead><tr><th>Period</th><th>Goals</th><th>Goals against</th><th>Shots</th><th>Shots against</th><th>FO won</th><th>FO lost</th></tr></thead>

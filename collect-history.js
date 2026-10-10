@@ -68,13 +68,16 @@ function parseProtocol(html, url, ourClubId) {
       }
     }
   }
+  // player of the game (MVP) of each team: <div class="mvp"><span>MVP: </span> <a href="/personas/...">Name</a></div>
+  const mvps = [...html.matchAll(/<div class="mvp">[\s\S]*?<a href="[^"]*">([^<]+)<\/a>/g)].map(m => fixCase(m[1]));
+  g.mvp = mvps.length >= 2 ? { us: weHome ? mvps[0] : mvps[1], them: weHome ? mvps[1] : mvps[0] } : null;
   // overtime / shootout
   const titles = [...html.matchAll(/<span class="title">([^<]+)<\/span>/g)].map(m => m[1].trim());
   const pdata = strip((html.match(/id="periodData">([\s\S]*?)<\/div>\s*<div class="score/) || [])[1] || '');
   const so = titles.some(x => /metien|bull|shoot|\bSO\b/i.test(x)) || /\bSO\b|metien/i.test(pdata);
   const ot = !so && (titles.some(x => /papild|\bOT\b/i.test(x)) || /\bOT\b|papild/i.test(pdata) || g.goals.some(x => x.period >= 4));
   g.decided = so ? 'SO' : ot ? 'OT' : '';
-  g.v = 2;   // reader version: older copies (wrong video link, no OT/SO) get read again once
+  g.v = 3;   // reader version: older copies (wrong video link, no OT/SO, no MVP) get read again once
   // our players' stats table (number, position, G, A, P, PIM)
   for (const tb of html.matchAll(/<table class="protocol-stats"><thead><tr><th[^>]*>#<\/th><th class="img-inlcuded"><a href="\/komandas\/[^"\/]+\/(\d+)"[\s\S]*?<tbody>([\s\S]*?)<\/tbody>/g)) {
     if (tb[1] !== String(ourClubId)) continue;
