@@ -424,14 +424,23 @@ function parseProtocol(html, url, ourClubId) {
 // Columns: Datums | Komanda (E7 / E9) | 1 LW | 1 C | 1 RW | 1 LD | 1 RD | 2 LW ... 3 RD | GK
 // Cells hold a player's name or jersey number. The tab is found by its name (anything with "sastāv"/"lineup").
 const LINEUP_TAB_HINT = /sast[aā]v|lineup|mai[nņ]/i;
+const LINEUP_CSV_URL = '';   // paste the tab's published CSV link here if the lookup by name can't find it
 async function fetchClubLineups(previous) {
   try {
     const base = CSV_URLS.data.split('/pub?')[0];
-    const html = await (await fetch(base + '/pubhtml?_cb=' + Date.now())).text();
-    const tabs = [...html.matchAll(/sheet-button-(\d+)"[^>]*>\s*<a[^>]*>([^<]+)</g)].map(m => ({ gid: m[1], name: m[2].trim() }));
-    const tab = tabs.find(t => LINEUP_TAB_HINT.test(t.name));
-    if (!tab) throw new Error(`no lineup tab found (published tabs: ${tabs.map(t => t.name).join(', ') || 'none'})`);
-    const text = await (await fetch(`${base}/pub?gid=${tab.gid}&single=true&output=csv&_cb=${Date.now()}`)).text();
+    let csvUrl = LINEUP_CSV_URL, tabName = 'link';
+    const html = csvUrl ? '' : await (await fetch(base + '/pubhtml?_cb=' + Date.now())).text();
+    // the published page lists its tabs either as buttons or in a script (name: "...", gid: "..."), where
+    // letters like "ņ" can be written as \u0146
+    const unesc = s => s.replace(/\\u([0-9a-fA-F]{4})/g, (m, h) => String.fromCharCode(parseInt(h, 16))).replace(/\\\//g, '/');
+    const tabs = [...html.matchAll(/sheet-button-(\d+)"[^>]*>\s*<a[^>]*>([^<]+)</g)].map(m => ({ gid: m[1], name: m[2].trim() }))
+      .concat([...html.matchAll(/name:\s*"((?:[^"\\]|\\.)*)"[^}]*?gid:\s*"(\d+)"/g)].map(m => ({ gid: m[2], name: unesc(m[1]).trim() })));
+    if (!csvUrl) {
+      const tab = tabs.find(t => LINEUP_TAB_HINT.test(t.name));
+      if (!tab) throw new Error(`no lineup tab found (published tabs: ${tabs.map(t => t.name).join(', ') || 'none'}; page starts: ${html.replace(/\s+/g, ' ').slice(0, 200)})`);
+      csvUrl = `${base}/pub?gid=${tab.gid}&single=true&output=csv`; tabName = tab.name;
+    }
+    const text = await (await fetch(csvUrl + (csvUrl.includes('?') ? '&' : '?') + '_cb=' + Date.now())).text();
     const rows = csvToObjects(text);
     const out = { E7: {}, E9: {} };
     const slotKey = k => { const m = String(k).replace(/\s+/g, '').toUpperCase().match(/^([123])[-_.]?(LW|C|RW|LD|RD)$/); return m ? `${m[1]} ${m[2]}` : /^(GK|V[ĀA]RTSARGS)$/i.test(String(k).trim()) ? 'GK' : null; };
@@ -447,7 +456,7 @@ async function fetchClubLineups(previous) {
       keys.forEach(k => { const s = slotKey(k), v = String(row[k] || '').trim(); if (s && v) lineup[s] = v; });
       if (Object.keys(lineup).length) out[div][date] = lineup;
     }
-    console.log(`lineups II/III (tab "${tab.name}"): E7 ${Object.keys(out.E7).length} games, E9 ${Object.keys(out.E9).length} games`);
+    console.log(`lineups II/III (${tabName}): E7 ${Object.keys(out.E7).length} games, E9 ${Object.keys(out.E9).length} games`);
     return out;
   } catch (err) {
     console.error('lineups II/III failed, keeping previous:', err.message);

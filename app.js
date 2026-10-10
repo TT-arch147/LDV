@@ -2239,8 +2239,12 @@ document.getElementById('statsTeamSelect') && document.getElementById('statsTeam
       const L = ((DATA.clubLineups || {})[div] || {})[g.date]; if (!L) return '';
       const pr = g.pr, pl = pr ? pr.players : [];
       const who = v => { v = String(v).trim();
+        const norm = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
         const byNr = /^#?\d+$/.test(v) ? pl.find(x => String(x.nr) === v.replace('#', '')) : null;
-        const byName = pl.find(x => (x.name || '').toLowerCase() === v.toLowerCase());
+        // full name, or just the surname (as typed in the sheet); "J. Bērziņš" picks the right one of two Bērziņš
+        const ini = (v.match(/^([A-Za-zĀ-ž])\.\s*/) || [])[1], sur = norm(v.replace(/^[A-Za-zĀ-ž]\.\s*/, '')).split(/\s+/).pop();
+        const bySur = pl.filter(x => norm(x.name).split(/\s+/).pop() === sur);
+        const byName = pl.find(x => norm(x.name) === norm(v)) || (ini ? bySur.find(x => norm(x.name)[0] === norm(ini)) : null) || bySur[0];
         const p = byNr || byName; const meta = players.find(x => x.name === (p ? p.name : v)) || {};
         return { name: p ? p.name : v, nr: p ? p.nr : meta.nr, g: p ? p.g : null, a: p ? p.a : null, pim: p ? p.pim : null, photo: photoOf(meta) }; };
       const gk = pr && pr.goalie;
