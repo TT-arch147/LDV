@@ -1957,7 +1957,7 @@ showSection(location.hash.slice(1) || 'home');
     }
     btn.addEventListener('click', e => { e.stopPropagation(); document.querySelectorAll('.season-dd.open').forEach(d => d !== wrap && d.classList.remove('open')); wrap.classList.toggle('open'); });
     menu.addEventListener('click', e => { const b = e.target.closest('button[data-v]'); if (!b) return;
-      sel.value = b.dataset.v; sel.dispatchEvent(new Event('change')); wrap.classList.remove('open'); draw(); });
+      sel.value = b.dataset.v; sel.dispatchEvent(new Event('change', { bubbles: true })); wrap.classList.remove('open'); draw(); });
     sel.addEventListener('change', draw);
     draw();
   }
@@ -2155,7 +2155,9 @@ document.getElementById('statsTeamSelect') && document.getElementById('statsTeam
     const seasonStart = d => { const [y, m] = d.split('-').map(Number); return m >= 8 ? y : y - 1; };
     const curSeason = Math.max(0, ...games.filter(g => g.played).map(g => seasonStart(g.date)));
     const allPlayed = games.filter(g => g.played);
-    const played = allPlayed.filter(g => seasonStart(g.date) === curSeason), upcoming = games.filter(g => !g.played && g.date >= today);
+    const selSeason = view.dataset.season || `TOTAL:${curSeason}-${curSeason + 1}`;
+    const selYear = selSeason === 'ALL' ? null : +((selSeason.match(/(\d{4})-\d{4}/) || [])[1] || curSeason);
+    const played = allPlayed.filter(g => selYear == null || seasonStart(g.date) === selYear), upcoming = games.filter(g => !g.played && g.date >= today);
     const W = played.filter(g => g.r === 'W').length, L = played.filter(g => g.r === 'L').length, D = played.filter(g => g.r === 'D').length;
     const sum = k => played.reduce((s, g) => s + (g[k] || 0), 0), GF = sum('us'), GA = sum('them');
     // shots and penalty minutes: from the protocols, or from the EHL team stats page until protocols are read
@@ -2260,6 +2262,21 @@ document.getElementById('statsTeamSelect') && document.getElementById('statsTeam
       return `<div class="panel"><div class="panel-head lineup-head"><h2 style="margin:0">Sastāvs</h2><div class="grp-chips cl-lines">${lines.length > 1 ? lines.map((n, i) => `<button type="button" data-line="${n}" class="${i ? '' : 'on'}">${n}. maiņa</button>`).join('') : ''}</div></div>
         <div class="rink cl-rink">${rows}<div class="rink-row gk show">${slot('GK', 'GK')}</div><div class="slot-pop"></div></div></div>`;
     };
+    const seasonPicker = cls => `<select class="${cls}">${[...new Set(allPlayed.map(g => seasonStart(g.date)))].sort((x, y) => y - x).map(s => `<optgroup label="${s}-${s + 1}"><option value="TOTAL:${s}-${s + 1}"${selSeason === `TOTAL:${s}-${s + 1}` ? ' selected' : ''}>Total</option></optgroup>`).join('')}<option value="ALL"${selSeason === 'ALL' ? ' selected' : ''}>All seasons</option></select>`;
+    // E5-style table: segmented switch (E9 groups, or E7 Top 10 / rest), logos, GP GF GA PP% PK% PTS, playoff lines
+    const tsTeams = ((DATA.clubTeamStats && DATA.clubTeamStats[div] && DATA.clubTeamStats[div].teams) || {});
+    const bigRows = (teams, offset) => teams.map((x, i) => { const n = offset + i + 1, st = tsTeams[up(x.team)] || {}, me = up(x.team) === up(t.name), wc = wildcards.has(up(x.team));
+      const cut = grouped ? (n === 2 ? 'playoff-cutoff' : '') : (n === 4 ? 'playoff-cutoff' : n === 12 ? 'cut-pi' : '');
+      const lg = me ? teamLogo('Ledus Veči') : logoFor(x.team) || logoFor(nice(x.team));
+      const p = v => v == null ? '—' : Math.round(v) + '%';
+      return `<tr class="${[me ? 'ldv-row' : '', cut, wc ? 'wc' : ''].join(' ')}"><td>${lg ? `<img class="league-logo" src="${lg}" alt="">` : ''}${esc(nice(x.team))}${wc ? ' <span class="wc-badge">WC</span>' : ''}</td>
+        <td>${x.gp ?? ''}</td><td>${st.gf ?? '—'}</td><td>${st.ga ?? '—'}</td><td>${p(st.pp)}</td><td>${p(st.pk)}</td><td class="pts">${x.points ?? ''}</td></tr>`; }).join('');
+    const bigTbl = (teams, offset, k, on) => `<table class="league-table" data-k="${k}"${on ? '' : ' style="display:none"'}><thead><tr><th style="text-align:left">Team</th><th>GP</th><th>GF</th><th>GA</th><th>PP%</th><th>PK%</th><th>PTS</th></tr></thead><tbody>${bigRows(teams, offset)}</tbody></table>`;
+    let bigTable = '<div class="empty-note">Tabula vēl nav ielādēta</div>';
+    if (grouped) bigTable = `<div class="league-group-box cl-league"><div class="grp-chips cl-seg" style="grid-template-columns:repeat(${divs.length},1fr)">${divs.map((d, i) => `<button type="button" data-k="${i}" class="${i === ourDiv ? 'on' : ''}">${esc(nice(d.division))}</button>`).join('')}</div>${divs.map((d, i) => bigTbl(d.teams, 0, i, i === ourDiv)).join('')}${legend}</div>`;
+    else if (divs.length === 1) { const all = divs[0].teams, half = pos >= 10 ? 1 : 0;
+      bigTable = all.length > 10 ? `<div class="league-group-box cl-league"><div class="grp-chips cl-seg">${['Top 10', `11.-${all.length}.`].map((l, i) => `<button type="button" data-k="${i}" class="${i === half ? 'on' : ''}">${l}</button>`).join('')}</div>${bigTbl(all.slice(0, 10), 0, 0, half === 0)}${bigTbl(all.slice(10), 10, 1, half === 1)}${legend}</div>`
+        : `<div class="league-group-box cl-league">${bigTbl(all, 0, 0, true)}${legend}</div>`; }
     // ---- Protokols ----
     const protocol = date => {
       const g = played.find(x => x.date === date); if (!g) return '<div class="empty-note">Nav spēļu</div>';
@@ -2272,22 +2289,22 @@ document.getElementById('statsTeamSelect') && document.getElementById('statsTeam
       const bar = (lbl, a, b) => { const sh = (a + b) ? a / (a + b) * 100 : 50; return `<div class="compare-row"><div class="compare-labels"><span class="h">${a}</span><span class="mid">${lbl}</span><span class="a">${b}</span></div><div class="duel sh" style="height:8px"><span class="g" style="width:${sh}%"></span><span class="a" style="width:${100 - sh}%"></span></div></div>`; };
       const pens = pr ? pr.penalties.map(x => `<div class="pen-row"><span>${x.side === 'us' ? esc(us) : esc(g.opp)}</span><b>${x.side === 'us' ? plink(x.player) : esc(x.player)}</b><span>${x.min} min · ${esc(x.reason || '')}</span></div>`).join('') : '';
       return `<div class="bx-pair bx-top">
-          <div class="scoreboard"><div class="sb-meta" style="text-align:center;color:var(--text-dim);font-size:13px">${dLong(g.date)}${g.arena ? ' · ' + esc(g.arena) : ''}</div>
+          <div class="scoreboard" style="position:relative">${(() => { const s = seasonStart(g.date), lg = seasonLogo(`Reg. Season ${s}-${s + 1}`) || seasonLogo(`Playoffs ${s}-${s + 1}`); return lg ? `<img class="sb-season-logo" src="${lg}" alt="">` : ''; })()}<div class="sb-meta">${g.date} · Sezona ${seasonStart(g.date)}-${seasonStart(g.date) + 1}</div>
             <div class="sb-row" style="margin-top:16px"><div class="sb-team" style="text-align:center">${bigLogo(L.logo, L.name)}<div class="sb-team-name" style="font-family:Oswald,sans-serif;font-size:22px;font-weight:600;margin-top:8px">${esc(L.name).toUpperCase()}</div></div>
               <div style="font-family:Oswald,sans-serif;font-size:56px;font-weight:700;margin:0 24px">${L.goals} <span style="color:var(--text-faint)">-</span> ${Rt.goals}</div>
               <div class="sb-team" style="text-align:center">${bigLogo(Rt.logo, Rt.name)}<div class="sb-team-name" style="font-family:Oswald,sans-serif;font-size:22px;font-weight:600;margin-top:8px">${esc(Rt.name).toUpperCase()}</div></div></div>
             <div style="text-align:center;margin-top:14px"><span class="result-badge ${g.r}" style="font-family:Oswald,sans-serif;font-weight:600;padding:4px 14px;border-radius:999px;background:${g.r === 'W' ? 'rgba(76,201,142,.15);color:var(--win)' : 'rgba(225,90,90,.15);color:var(--loss)'}">${(g.r === 'W' ? 'UZVARA' : g.r === 'L' ? 'ZAUDĒJUMS' : 'NEIZŠĶIRTS') + (g.decided === 'OT' ? ' PAPILDLAIKĀ' : g.decided === 'SO' ? ' PĒCSPĒLES METIENOS' : '')}</span></div>
-            ${pr && pr.mvp && (pr.mvp.us || pr.mvp.them) ? `<div class="mvp-line">Spēles labākie: ${[pr.mvp.us ? `<b>${plink(pr.mvp.us)}</b> (${esc(us)})` : '', pr.mvp.them ? `<b>${esc(pr.mvp.them)}</b> (${esc(g.opp)})` : ''].filter(Boolean).join(' · ')}</div>` : ''}<div style="text-align:center;margin-top:12px;display:flex;gap:18px;justify-content:center">${pr && pr.video ? `<a href="${pr.video.replace('/embed/', '/watch?v=')}" target="_blank" rel="noopener">▶ Spēles video</a>` : ''}${g.link ? `<a href="${g.link}" target="_blank" rel="noopener">EHL protokols →</a>` : ''}</div></div>
+            ${pr && pr.mvp && pr.mvp.us ? `<div class="mvp-line">Spēles labākais: <b>${plink(pr.mvp.us)}</b></div>` : ''}<div style="text-align:center;margin-top:12px;display:flex;gap:18px;justify-content:center">${pr && pr.video ? `<a href="${pr.video.replace('/embed/', '/watch?v=')}" target="_blank" rel="noopener">▶ Spēles video</a>` : ''}${g.link ? `<a href="${g.link}" target="_blank" rel="noopener">EHL protokols →</a>` : ''}</div></div>
           <div class="panel bx-stats"><h2>Spēles statistika</h2>${pr ? [bar('Metieni pa vārtiem', L.s === 'us' ? pr.shots.us : pr.shots.them, L.s === 'us' ? pr.shots.them : pr.shots.us),
               bar('Soda minūtes', L.s === 'us' ? g.pim : g.pimA, L.s === 'us' ? g.pimA : g.pim),
               pr.faceoffs && (pr.faceoffs.us || pr.faceoffs.them) ? bar('Iemetieni', L.s === 'us' ? pr.faceoffs.us : pr.faceoffs.them, L.s === 'us' ? pr.faceoffs.them : pr.faceoffs.us) : ''].join('') +
-              (pr.goalie ? `<div class="gk-line">Vārtsargs: <b>${plink(pr.goalie.name)}</b> · ${pr.goalie.sa - pr.goalie.ga}/${pr.goalie.sa} · ${pc((pr.goalie.sa - pr.goalie.ga) / pr.goalie.sa * 100)}</div>` : '') : '<div class="empty-note">Protokols vēl nav ielādēts</div>'}</div></div>
+              '' : '<div class="empty-note">Protokols vēl nav ielādēts</div>'}</div></div>
         <div class="bx-pair"><div class="panel"><h2>Vārti</h2><div class="goal-cols"><div><div class="goal-col-title">${logoImg(L.logo, L.name)}<span>${esc(L.name).toUpperCase()}</span></div>${goalsOf(L.s)}</div>
             <div><div class="goal-col-title">${logoImg(Rt.logo, Rt.name)}<span>${esc(Rt.name).toUpperCase()}</span></div>${goalsOf(Rt.s)}</div></div></div>
           <div class="panel"><h2>Noraidījumi</h2>${pens || '<div class="empty-note">Nav</div>'}</div></div>${lineupPanel(g)}`;
     };
     const gameOpts = played.slice().reverse().map(g => `<option value="${g.date}">${g.date} · ${g.home ? 'vs' : '@'} ${esc(g.opp)} (${g.us}-${g.them})</option>`).join('');
-    const protoPane = played.length ? `<div class="game-nav" style="padding-left:0;padding-right:0"><select class="cl-game">${gameOpts}</select></div><div class="cl-proto">${protocol(played[played.length - 1].date)}</div>` : '<div class="empty-note">Vēl nav aizvadītu spēļu</div>';
+    const protoPane = played.length ? `<div class="game-nav cl-nav" style="padding-left:0;padding-right:0">${seasonPicker('cl-season-page')}<button class="nav-btn cl-prev">‹</button><select class="cl-game">${gameOpts}</select><button class="nav-btn cl-next">›</button></div><div class="cl-proto">${protocol(played[played.length - 1].date)}</div>` : '<div class="empty-note">Vēl nav aizvadītu spēļu</div>';
 
     // ---- Spēlētāju statistika ----
     // season value as used by the E5 pickers ("Reg. Season 2026-2027", "Playoffs 2025-2026", "TOTAL:2025-2026", "ALL")
@@ -2342,7 +2359,7 @@ document.getElementById('statsTeamSelect') && document.getElementById('statsTeam
       ['Aizsardzība', [['GA', GA, (GA / gp).toFixed(1)], ['SA', SA, (SA / gp).toFixed(1)], ['Save%', pc(SA ? (SA - GA) / SA * 100 : null), null]]],
       ['Iemetieni', [['FOW', FOW, (FOW / gp).toFixed(1)], ['FOL', FOL, (FOL / gp).toFixed(1)], ['FO%', pc(FOW + FOL ? FOW / (FOW + FOL) * 100 : null), null]]],
       ['Disciplīna', [['PIM', PIM, (PIM / gp).toFixed(1)], ['PIM pret', PIMA, (PIMA / gp).toFixed(1)]]]];
-    const teamPane = `<div class="bx-pair ts-pair">
+    const teamPane = `<div class="game-nav cl-nav" style="padding:0 0 16px">${seasonPicker('cl-season-page')}</div><div class="bx-pair ts-pair">
         <div class="panel"><h2>Bilance</h2><div class="rec2" style="margin-top:14px">
           <div class="rec-ring" style="background:conic-gradient(var(--win) 0 ${winPct}%, var(--loss) ${winPct}% 100%)"><div><b>${winPct}%</b><span>uzvaras</span></div></div>
           <div class="rec-side"><div class="rec-top"><div class="rec-gp"><b>${played.length}</b><span>spēles</span></div>
@@ -2355,8 +2372,9 @@ document.getElementById('statsTeamSelect') && document.getElementById('statsTeam
           ${played.slice().reverse().map(g => `<tr><td>${g.date}</td><td class="name">${g.home ? 'vs' : '@'} ${logoImg(g.logo, g.opp)}${esc(g.opp)}${otTag(g.decided)}</td><td class="num">${g.us}</td><td class="num">${g.them}</td><td class="num">${g.s ?? '—'}</td><td class="num">${g.sa ?? '—'}</td><td class="num">${g.pim ?? '—'}</td><td class="num">${g.pimA ?? '—'}</td><td class="num"><a href="#" data-game="${g.date}">Protokols</a></td></tr>`).join('')}</table></div></div></div>
       <div class="cl-bottom"><div class="panel"><h2>Sezonas kopsummas un vidējie</h2><table id="clTot-${div}" class="cl-totals"><tr><th></th><th>Kopā</th><th>Vidēji spēlē</th></tr>
         ${totals.map(([title, rows]) => `<tr class="tt-group"><td colspan="3">${title}</td></tr>` + rows.map(([l, v, av]) => av === null ? `<tr><td>${l}</td><td colspan="2" style="text-align:center"><b>${v}</b></td></tr>` : `<tr><td>${l}</td><td><b>${v}</b></td><td style="color:var(--text-dim)">${av}</td></tr>`).join('')).join('')}</table></div>
-        <div class="panel cl-table-next"><div class="league-layout"><div>${tablePanel.replace('class="panel', 'class="tbl-inner').replace('class="tbl-inner ov-switch', 'class="tbl-inner ov-switch')}</div>
-          <div class="calendar-section cl-next"><div class="league-group-title">Nākamās spēles</div>${upcoming.slice(0, 6).map(g => `<div class="ov-up"><span class="when">${dShort(g.date)}</span><span>${g.home ? 'vs' : '@'} ${logoImg(g.logo, g.opp)}${esc(g.opp)}${g.time ? ' · ' + g.time : ''}${g.arena ? ' · ' + esc(g.arena) : ''}</span></div>`).join('') || '<div class="empty-note">Vēl nekas nav ieplānots</div>'}</div></div></div></div>`;
+        <div class="panel team-league-col cl-table-next"><h2>${div} turnīra tabula</h2><div class="league-layout"><div class="league-groups-row">${bigTable}</div>
+          <div class="calendar-section"><div class="league-group-title">Nākamās spēles</div><div id="clNext-${div}">${upcoming.slice(0, 6).map(g => `<div class="calendar-row"><div class="calendar-opp"><span class="vs">${g.home ? 'vs' : '@'}</span>${g.logo ? `<img class="league-logo" src="${g.logo}" alt="">` : ''}${esc(g.opp)}</div>
+            <div class="calendar-when">${dLong(g.date).replace(/ \d{4}$/, '')}${g.time ? ' · ' + g.time : ''}${g.arena ? ' · ' + esc(g.arena) : ''}</div></div>`).join('') || '<div class="empty-note">Vēl nekas nav ieplānots</div>'}</div></div></div></div></div>`;
 
     // ---- Sastāvs ----
     const groups = players.some(p => p.pos) ? POS : [[null, 'Spēlētāji']];
@@ -2375,7 +2393,8 @@ document.getElementById('statsTeamSelect') && document.getElementById('statsTeam
         <div class="cpane" data-p="roster" style="padding-top:10px">${rosterPane}</div>
       </div>`;
     view._protocol = protocol; view._playerView = playerView;
-    if (window.enhanceSeasonSelect) { const ss = view.querySelector('.cl-season'); if (ss) { ss.id = 'clSeason' + div; window.enhanceSeasonSelect(ss); } }
+    if (window.enhanceSeasonSelect) { const ss = view.querySelector('.cl-season'); if (ss) { ss.id = 'clSeason' + div; window.enhanceSeasonSelect(ss); }
+      view.querySelectorAll('.cl-season-page').forEach((s, i) => { s.id = `clSeasonPage${div}${i}`; window.enhanceSeasonSelect(s); }); }
     { const ct = view.querySelector('.cl-team'); if (ct) ct.style.display = ct.options.length > 1 ? '' : 'none'; }
     view._opts = () => ({ season: (view.querySelector('.cl-season') || {}).value || '', hlOnly: !!(view.querySelector('.cl-hl') || {}).checked });
     view._openPlayer = name => { const sel = view.querySelector('.cl-player'); if (!sel || ![...sel.options].some(o => o.value === name || o.textContent === name)) return;
@@ -2395,6 +2414,12 @@ document.getElementById('statsTeamSelect') && document.getElementById('statsTeam
       if (pl) { e.preventDefault(); view._openPlayer(pl.dataset.player); window.scrollTo(0, 0); return; }
       const gl = e.target.closest('a[data-game]');
       if (gl) { e.preventDefault(); const sel = view.querySelector('.cl-game'); if (sel) { sel.value = gl.dataset.game; view.querySelector('.cl-proto').innerHTML = view._protocol(sel.value); } show('box'); window.scrollTo(0, 0); return; }
+      const sg = e.target.closest('.cl-seg button');
+      if (sg) { const box = sg.closest('.cl-league'); box.querySelectorAll('.cl-seg button').forEach(x => x.classList.toggle('on', x === sg));
+        box.querySelectorAll('table[data-k]').forEach(t => t.style.display = t.dataset.k === sg.dataset.k ? '' : 'none'); return; }
+      const nb = e.target.closest('.cl-prev, .cl-next');
+      if (nb) { const sel = view.querySelector('.cl-game'); const i = sel.selectedIndex + (nb.classList.contains('cl-prev') ? 1 : -1);
+        if (i >= 0 && i < sel.options.length) { sel.selectedIndex = i; view.querySelector('.cl-proto').innerHTML = view._protocol(sel.value); } return; }
       const b = e.target.closest('.ov-switch .grp-chips button');
       if (b) { const box = b.closest('.ov-switch'); box.querySelectorAll('.grp-chips button').forEach(x => x.classList.toggle('on', x === b));
         box.querySelectorAll('.ov-part').forEach(d => d.style.display = d.dataset.i === b.dataset.i ? '' : 'none'); return; }
@@ -2423,6 +2448,8 @@ document.getElementById('statsTeamSelect') && document.getElementById('statsTeam
     });
     view.addEventListener('mouseout', e => { const rk = e.target.closest('.cl-rink'); if (rk && (!e.relatedTarget || !e.relatedTarget.closest || !e.relatedTarget.closest('.cl-rink .slot'))) { const p = rk.querySelector('.slot-pop'); if (p) p.style.display = 'none'; } });
     view.addEventListener('change', e => {
+      if (e.target.matches('.cl-season-page')) {   // season picker on Protokols / Komandas statistika: redraw the page for that season
+        const tab = (view.querySelector('.ctab.active') || {}).dataset; view.dataset.season = e.target.value; render(view); show(tab ? tab.p : 'ov'); return; }
       if (e.target.matches('.cl-game')) view.querySelector('.cl-proto').innerHTML = view._protocol(e.target.value);
       if (e.target.matches('.cl-player')) view._openPlayer(e.target.value);
       if (e.target.matches('.cl-team')) { const name = view.querySelector('.cl-player').value, div = e.target.value;

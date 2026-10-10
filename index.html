@@ -1052,6 +1052,60 @@ footer{text-align:center;color:var(--text-faint);font-size:12px;padding:20px;}
 .mvp-line b{color:var(--text);}
 .ce-g.played{cursor:pointer;} .ce-g.played:hover{filter:brightness(1.25);}
 .ce-sub .home-res{margin-left:4px;font-size:10px;padding:0 4px;vertical-align:0;}
+
+/* II / III: E5-style table on Komandas statistika */
+.cl-league .panel-head{margin-bottom:8px;}
+.cl-league table[data-g]{display:none;}
+.cl-league.show-Z table[data-g="Z"],.cl-league.show-D table[data-g="D"]{display:table;}
+.cl-league .panel-head .league-group-title{display:none;}
+.cl-league .panel-head{justify-content:flex-end;}
+.cl-league .grp-chips button{font-size:13.5px;padding:6px 16px;}
+.cl-league{padding:16px 18px;}
+.cl-league .league-table{font-size:15.5px;}
+.cl-league .league-table th{font-size:12.5px;padding:8px 10px;}
+.cl-league .league-table td{padding:11px 10px;}
+.cl-league .league-logo{width:24px;height:24px;margin-right:10px;}
+.cl-league .league-table{font-size:20px;}
+.cl-league .league-table th{font-size:13.5px;padding:6px 10px;}
+.cl-league .league-table td{padding:7px 10px;line-height:1.25;}
+.cl-league .league-logo{width:30px;height:30px;}
+.cl-league .panel-head{display:block;margin-bottom:10px;}
+.cl-league .grp-chips{display:grid;grid-template-columns:1fr 1fr;gap:0;width:100%;margin:0;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:4px;}
+.cl-league .grp-chips button{border:none;border-radius:7px;padding:10px 0;font-size:15px;background:transparent;}
+.cl-league .grp-chips button.on{background:var(--ice);color:#fff;}
+.cl-league{display:flex;flex-direction:column;}
+.cl-league.show-Z table[data-g="Z"],.cl-league.show-D table[data-g="D"]{flex:1;height:100%;}
+.cl-league .league-table{font-size:26px;}
+.cl-league .league-table th{font-size:14px;}
+.cl-league .league-logo{width:38px;height:38px;margin-right:12px;}
+.cl-league .league-table{font-size:19px;}
+.cl-league .league-table td:not(:first-child),.cl-league .league-table th:not(:first-child){text-align:center;padding-left:6px;padding-right:6px;}
+.cl-league .league-table td:nth-child(5),.cl-league .league-table td:nth-child(6){color:var(--text-dim);}
+.cl-league .league-table td.pts{font-weight:700;}
+.cl-league .league-logo{width:30px;height:30px;}
+.cl-league .league-table{font-size:21px;}
+.cl-league .league-logo{width:46px;height:46px;margin-right:14px;}
+.cl-league .league-table thead th{cursor:pointer;user-select:none;white-space:nowrap;}
+.cl-league .league-table thead th:hover{color:var(--text);}
+.cl-league .league-table thead th.sort-on{color:#D04BAE;}
+.cl-league .league-table thead th::after{content:attr(data-arrow);font-size:9px;margin-left:3px;}
+.cl-league.sorted .league-table tr.playoff-cutoff td{border-bottom:1px solid var(--line);}
+.cl-league table{display:table;width:100%;}
+.cl-league .grp-chips.cl-seg{display:grid;grid-template-columns:1fr 1fr;gap:0;width:100%;margin:0 0 10px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:4px;}
+.cl-league .cl-seg button{border:none;border-radius:7px;padding:10px 0;font-size:15px;background:transparent;color:var(--text-dim);cursor:pointer;font-weight:600;}
+.cl-league .cl-seg button.on{background:var(--ice);color:#fff;}
+.league-table tr.cut-pi td{border-bottom:2px dashed rgba(232,178,79,.6);}
+.league-table tr.wc td{background:rgba(232,178,79,.07);}
+.cl-nav{display:flex;gap:10px;align-items:center;}
+.cl-nav .cl-game{flex:1;}
+
+.cl-bottom{grid-template-columns:minmax(0,300px) minmax(0,1fr);}
+.cl-table-next .league-layout{grid-template-columns:minmax(0,2.3fr) minmax(0,1fr);}
+.cl-league .league-table td:first-child{white-space:nowrap;}
+.cl-league .league-logo{vertical-align:middle;}
+.cl-table-next h2{margin-bottom:14px;}
+.cl-table-next .calendar-row{display:flex;flex-direction:column;align-items:flex-start;gap:8px;padding:12px 0;border-bottom:1px solid var(--line);}
+.cl-table-next .calendar-when{text-align:left;}
 </style>
 </head>
 <body>
