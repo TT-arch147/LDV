@@ -2379,10 +2379,23 @@ document.getElementById('statsTeamSelect') && document.getElementById('statsTeam
 
     // ---- Sastāvs ----
     const groups = players.some(p => p.pos) ? POS : [[null, 'Spēlētāji']];
+    // Sastāvs: the same cards as on Ledus Veči (photo, name + number, height · weight · hand, position, EHL link, numbers)
+    const HANDL = { LEFT: 'kreisais tvēriens', RIGHT: 'labais tvēriens' };
+    const gkStat = n => goalies.find(x => x.name === n);
+    const rstat = (l, v) => `<div class="roster-stat"><div class="roster-stat-num">${nz(v)}</div><div class="roster-stat-label">${l}</div></div>`;
+    const rosterCardCl = p => { const g = p.pos === 'G' ? gkStat(p.name) : null, ph = photoOf(p);
+      const stats = p.pos === 'G' ? [['GP', g ? g.gp : p.gp], ['SA', g ? g.sa : null], ['SV', g ? g.sa - g.ga : null], ['SV%', g && g.sa ? Math.round((g.sa - g.ga) / g.sa * 1000) / 10 + '%' : null]]
+        : [['GP', p.gp], ['G', p.g], ['A', p.a], ['P', p.p], ['PIM', p.pim]];
+      return `<div class="roster-card">${ph ? `<img class="roster-photo" src="${ph}" alt="" onerror="this.src=DEFAULT_PHOTO">` : `<img class="roster-photo" src="${typeof DEFAULT_PHOTO !== 'undefined' ? DEFAULT_PHOTO : ''}" alt="">`}
+        <div style="flex:1;min-width:0;">
+          <div class="roster-info-name">${plink(p.name)} <span style="color:var(--text-faint);font-weight:500;">#${p.nr ?? '—'}</span></div>
+          <div class="roster-info-meta">${[p.height, p.weight, HANDL[p.handedness] || ''].filter(Boolean).join(' · ')}</div>
+          <span class="roster-pos-badge ${POSL[p.pos] || ''}">${POSL[p.pos] || '—'}</span>
+          ${p.ehl ? `<a class="card-ehl" style="display:block;margin-top:4px;font-size:11.5px;" href="${p.ehl}" target="_blank" rel="noopener">EHL profils →</a>` : ''}
+          <div class="roster-stat-row">${stats.map(([l, v]) => rstat(l, v)).join('')}</div>
+        </div></div>`; };
     const rosterPane = groups.map(([k, label]) => { const list = players.filter(p => (p.pos || null) === k).sort((x, y) => (y.gp ?? 0) - (x.gp ?? 0) || x.name.localeCompare(y.name)); if (!list.length) return '';
-      return `<div class="roster-section-title">${label}</div><div class="cl-roster">${list.map(p => `<div class="cl-card">${imgOrPh(photoOf(p), 'cl-av')}
-        <div style="min-width:0"><div class="nm">${plink(p.name)} <span style="color:var(--text-faint);font-weight:500">${p.nr != null ? '#' + p.nr : ''}</span></div><div class="mt">${p.pos ? `<span class="pos-badge">${POSL[p.pos]}</span>` : ''}${p.ehl ? ` · <a href="${p.ehl}" target="_blank" rel="noopener">EHL profils →</a>` : ''}</div>
-        <div class="st">${(k === 'G' ? [['GP', p.gp]] : [['GP', p.gp], ['G', p.g], ['A', p.a], ['P', p.p], ['PIM', p.pim]]).map(([l, v]) => `<div><b>${nz(v)}</b><span>${l}</span></div>`).join('')}</div></div></div>`).join('')}</div>`; }).join('');
+      return `<div class="roster-section-title">${label}</div><div class="roster-grid">${list.map(rosterCardCl).join('')}</div>`; }).join('');
 
     view.innerHTML = `<div class="subtabs">${[['ov', 'Pārskats'], ['box', 'Protokols'], ['pl', 'Spēlētāju statistika'], ['team', 'Komandas statistika'], ['roster', 'Sastāvs']]
         .map(([k, l], i) => `<button class="ctab${i ? '' : ' active'}" data-p="${k}">${l}</button>`).join('')}</div>
