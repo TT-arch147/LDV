@@ -2233,6 +2233,29 @@ document.getElementById('statsTeamSelect') && document.getElementById('statsTeam
         <div><div class="panel"><div class="panel-head"><span class="league-group-title">Rezultatīvākie spēlētāji</span></div>${scoringHtml}</div></div>
         <div>${tablePanel}</div></div>`;
 
+
+    // ---- Sastāvs on the rink (lineup from the "Sastāvi" sheet tab, numbers from the EHL protocol) ----
+    const lineupPanel = g => {
+      const L = ((DATA.clubLineups || {})[div] || {})[g.date]; if (!L) return '';
+      const pr = g.pr, pl = pr ? pr.players : [];
+      const who = v => { v = String(v).trim();
+        const byNr = /^#?\d+$/.test(v) ? pl.find(x => String(x.nr) === v.replace('#', '')) : null;
+        const byName = pl.find(x => (x.name || '').toLowerCase() === v.toLowerCase());
+        const p = byNr || byName; const meta = players.find(x => x.name === (p ? p.name : v)) || {};
+        return { name: p ? p.name : v, nr: p ? p.nr : meta.nr, g: p ? p.g : null, a: p ? p.a : null, pim: p ? p.pim : null, photo: photoOf(meta) }; };
+      const gk = pr && pr.goalie;
+      const slot = (key, label) => { const v = L[key]; if (!v) return '';
+        const p = who(v), parts = String(p.name).split(' '), last = parts.length > 1 ? parts.pop() : '', first = parts.join(' ');
+        const stat = label === 'GK' ? (gk && gk.name === p.name ? `${gk.sa - gk.ga}/${gk.sa} SV · ${pc(gk.sa ? (gk.sa - gk.ga) / gk.sa * 100 : null)}` : '')
+          : (p.g != null ? `${p.g}G ${p.a}A · ${p.pim}PIM` : '');
+        return `<div class="slot" data-n="${esc(p.name)}" data-date="${g.date}">${p.photo ? `<img class="slot-photo" src="${p.photo}" alt="" onerror="this.outerHTML='<div class=&quot;slot-photo slot-photo-empty&quot;></div>'">` : '<div class="slot-photo slot-photo-empty"></div>'}
+          <div class="slot-label">${label}</div><div class="slot-name"><span class="nw">${p.nr != null ? `<span class="slot-nr">#${p.nr}</span> ` : ''}${plink(first || p.name)}</span>${last ? '<br>' + esc(last) : ''}</div>${stat ? `<div class="slot-stat">${stat}</div>` : ''}</div>`; };
+      const lines = [1, 2, 3].filter(n => ['LW', 'C', 'RW', 'LD', 'RD'].some(k => L[`${n} ${k}`]));
+      const rows = lines.map(n => `<div class="rink-row${n === lines[0] ? ' show' : ''}" data-line="${n}">${['LW', 'C', 'RW'].map(k => slot(`${n} ${k}`, k)).join('')}</div>
+        <div class="rink-row def${n === lines[0] ? ' show' : ''}" data-line="${n}">${['LD', 'RD'].map(k => slot(`${n} ${k}`, k)).join('')}</div>`).join('');
+      return `<div class="panel"><div class="panel-head lineup-head"><h2 style="margin:0">Sastāvs</h2><div class="grp-chips cl-lines">${lines.length > 1 ? lines.map((n, i) => `<button type="button" data-line="${n}" class="${i ? '' : 'on'}">${n}. maiņa</button>`).join('') : ''}</div></div>
+        <div class="rink cl-rink">${rows}<div class="rink-row gk show">${slot('GK', 'GK')}</div><div class="slot-pop"></div></div></div>`;
+    };
     // ---- Protokols ----
     const protocol = date => {
       const g = played.find(x => x.date === date); if (!g) return '<div class="empty-note">Nav spēļu</div>';
@@ -2257,7 +2280,7 @@ document.getElementById('statsTeamSelect') && document.getElementById('statsTeam
               (pr.goalie ? `<div class="gk-line">Vārtsargs: <b>${plink(pr.goalie.name)}</b> · ${pr.goalie.sa - pr.goalie.ga}/${pr.goalie.sa} · ${pc((pr.goalie.sa - pr.goalie.ga) / pr.goalie.sa * 100)}</div>` : '') : '<div class="empty-note">Protokols vēl nav ielādēts</div>'}</div></div>
         <div class="bx-pair"><div class="panel"><h2>Vārti</h2><div class="goal-cols"><div><div class="goal-col-title">${logoImg(L.logo, L.name)}<span>${esc(L.name).toUpperCase()}</span></div>${goalsOf(L.s)}</div>
             <div><div class="goal-col-title">${logoImg(Rt.logo, Rt.name)}<span>${esc(Rt.name).toUpperCase()}</span></div>${goalsOf(Rt.s)}</div></div></div>
-          <div class="panel"><h2>Noraidījumi</h2>${pens || '<div class="empty-note">Nav</div>'}</div></div>`;
+          <div class="panel"><h2>Noraidījumi</h2>${pens || '<div class="empty-note">Nav</div>'}</div></div>${lineupPanel(g)}`;
     };
     const gameOpts = played.slice().reverse().map(g => `<option value="${g.date}">${g.date} · ${g.home ? 'vs' : '@'} ${esc(g.opp)} (${g.us}-${g.them})</option>`).join('');
     const protoPane = played.length ? `<div class="game-nav" style="padding-left:0;padding-right:0"><select class="cl-game">${gameOpts}</select></div><div class="cl-proto">${protocol(played[played.length - 1].date)}</div>` : '<div class="empty-note">Vēl nav aizvadītu spēļu</div>';
@@ -2361,6 +2384,9 @@ document.getElementById('statsTeamSelect') && document.getElementById('statsTeam
     const show = k => { view.querySelectorAll('.ctab').forEach(x => x.classList.toggle('active', x.dataset.p === k)); view.querySelectorAll('.cpane').forEach(p => p.classList.toggle('on', p.dataset.p === k)); };
     view.addEventListener('click', e => {
       const tb = e.target.closest('.ctab'); if (tb) { show(tb.dataset.p); return; }
+      const lb = e.target.closest('.cl-lines button');
+      if (lb) { const r = lb.closest('.panel'); r.querySelectorAll('.cl-lines button').forEach(x => x.classList.toggle('on', x === lb));
+        r.querySelectorAll('.rink-row:not(.gk)').forEach(x => x.classList.toggle('show', x.dataset.line === lb.dataset.line)); return; }
       const pl = e.target.closest('a[data-player]');
       if (pl) { e.preventDefault(); view._openPlayer(pl.dataset.player); window.scrollTo(0, 0); return; }
       const gl = e.target.closest('a[data-game]');
@@ -2372,6 +2398,26 @@ document.getElementById('statsTeamSelect') && document.getElementById('statsTeam
       if (m) { const open = m.dataset.open !== '1'; m.closest('.panel').querySelectorAll('tr.extra').forEach(r => r.style.display = open ? '' : 'none');
         m.dataset.open = open ? '1' : '0'; m.textContent = open ? 'Rādīt top 10' : `Rādīt visus ${m.closest('.panel').querySelectorAll('tr').length - 1} spēlētājus`; }
     });
+    // hover a player on the II / III rink: that game's numbers
+    view.addEventListener('mouseover', e => {
+      const s = e.target.closest('.cl-rink .slot'); if (!s) return;
+      const rink = s.closest('.cl-rink'), pop = rink.querySelector('.slot-pop'), name = s.dataset.n;
+      const pr = (((DATA.clubGames || {})[view.dataset.div]) || []).find(x => x.date === s.dataset.date); if (!pr) return;
+      const p = pr.players.find(x => x.name === name), gk = pr.goalie && pr.goalie.name === name ? pr.goalie : null;
+      const ours = pr.goals.filter(x => x.side === 'us');
+      const ppg = ours.filter(x => x.pp && x.scorer === name).length, ppa = ours.filter(x => x.pp && (x.a1 === name || x.a2 === name)).length;
+      const tiles = gk ? [['Shots faced', gk.sa], ['Saves', gk.sa - gk.ga], ['GA', gk.ga], ['SV%', gk.sa ? Math.round((gk.sa - gk.ga) / gk.sa * 1000) / 10 + '%' : '—']]
+        : p ? [['G', p.g], ['A', p.a], ['P', p.g + p.a], ['PPG', ppg], ['PPA', ppa], ['PIM', p.pim]] : [];
+      if (!tiles.length) return;
+      pop.innerHTML = `<div class="pc-head"><div><div class="pc-name">${name}</div><div class="pc-meta">${p && p.nr != null ? '#' + p.nr + ' · ' : ''}${s.querySelector('.slot-label').textContent}</div></div></div>
+        <div class="pc-body"><div class="pc-all" style="margin-top:0;padding-top:0;border-top:none;grid-template-columns:repeat(${tiles.length > 4 ? 3 : 4},1fr)">${tiles.map(([l, v]) => `<div><b>${v}</b><span>${l}</span></div>`).join('')}</div></div>`;
+      pop.style.display = 'block';
+      const r = rink.getBoundingClientRect(), q = s.getBoundingClientRect();
+      const left = Math.max(4, Math.min(q.left - r.left + q.width / 2 - pop.offsetWidth / 2, r.width - pop.offsetWidth - 4));
+      const lower = (q.top + q.height / 2 - r.top) > r.height * 0.45;
+      pop.style.left = left + 'px'; pop.style.top = (lower ? Math.max(4, q.top - r.top - pop.offsetHeight - 8) : q.bottom - r.top + 8) + 'px';
+    });
+    view.addEventListener('mouseout', e => { const rk = e.target.closest('.cl-rink'); if (rk && (!e.relatedTarget || !e.relatedTarget.closest || !e.relatedTarget.closest('.cl-rink .slot'))) { const p = rk.querySelector('.slot-pop'); if (p) p.style.display = 'none'; } });
     view.addEventListener('change', e => {
       if (e.target.matches('.cl-game')) view.querySelector('.cl-proto').innerHTML = view._protocol(e.target.value);
       if (e.target.matches('.cl-player')) view._openPlayer(e.target.value);

@@ -420,6 +420,41 @@ function parseProtocol(html, url, ourClubId) {
   return g;
 }
 
+// ---------- Ledus Veči II / III lineups: your Google Sheet tab (one row per game) ----------
+// Columns: Datums | Komanda (E7 / E9) | 1 LW | 1 C | 1 RW | 1 LD | 1 RD | 2 LW ... 3 RD | GK
+// Cells hold a player's name or jersey number. The tab is found by its name (anything with "sastāv"/"lineup").
+const LINEUP_TAB_HINT = /sast[aā]v|lineup|mai[nņ]/i;
+async function fetchClubLineups(previous) {
+  try {
+    const base = CSV_URLS.data.split('/pub?')[0];
+    const html = await (await fetch(base + '/pubhtml?_cb=' + Date.now())).text();
+    const tabs = [...html.matchAll(/sheet-button-(\d+)"[^>]*>\s*<a[^>]*>([^<]+)</g)].map(m => ({ gid: m[1], name: m[2].trim() }));
+    const tab = tabs.find(t => LINEUP_TAB_HINT.test(t.name));
+    if (!tab) throw new Error(`no lineup tab found (published tabs: ${tabs.map(t => t.name).join(', ') || 'none'})`);
+    const text = await (await fetch(`${base}/pub?gid=${tab.gid}&single=true&output=csv&_cb=${Date.now()}`)).text();
+    const rows = csvToObjects(text);
+    const out = { E7: {}, E9: {} };
+    const slotKey = k => { const m = String(k).replace(/\s+/g, '').toUpperCase().match(/^([123])[-_.]?(LW|C|RW|LD|RD)$/); return m ? `${m[1]} ${m[2]}` : /^(GK|V[ĀA]RTSARGS)$/i.test(String(k).trim()) ? 'GK' : null; };
+    for (const row of rows) {
+      const keys = Object.keys(row), get = re => { const k = keys.find(x => re.test(String(x).trim())); return k ? String(row[k] || '').trim() : ''; };
+      const dm = get(/^datums$|^date$/i).match(/^(\d{1,2})[./](\d{1,2})[./](\d{4})$/) || get(/^datums$|^date$/i).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (!dm) continue;
+      const date = dm[3].length === 4 ? `${dm[3]}-${dm[2].padStart(2, '0')}-${dm[1].padStart(2, '0')}` : `${dm[1]}-${dm[2]}-${dm[3]}`;
+      const team = get(/^komanda$|^team$/i).toUpperCase();
+      const div = /E9|III/.test(team) ? 'E9' : /E7|II/.test(team) ? 'E7' : null;
+      if (!div) continue;
+      const lineup = {};
+      keys.forEach(k => { const s = slotKey(k), v = String(row[k] || '').trim(); if (s && v) lineup[s] = v; });
+      if (Object.keys(lineup).length) out[div][date] = lineup;
+    }
+    console.log(`lineups II/III (tab "${tab.name}"): E7 ${Object.keys(out.E7).length} games, E9 ${Object.keys(out.E9).length} games`);
+    return out;
+  } catch (err) {
+    console.error('lineups II/III failed, keeping previous:', err.message);
+    return previous || null;
+  }
+}
+
 // ---------- Home page: all three club teams (E5, E7, E9) from the EHL calendar ----------
 // Each team's own calendar view (the same POST the E5 code above uses) lists its played games
 // with scores and protocol links, and its upcoming games. The same view for the next opponent
@@ -828,13 +863,15 @@ async function fetchPracticeExtras(previous) {
       .forEach(f => { const k = keyOf(f.replace(/\.[^.]+$/, '')); if (!logoFiles[k]) logoFiles[k] = 'logos/' + encodeURIComponent(f); });
     console.log(`logo files: ${Object.keys(logoFiles).length}`);
   } catch (err) { console.error('logo files:', err.message); }
+  let clubLineups = STATIC.clubLineups;
+  try { clubLineups = await fetchClubLineups(STATIC.clubLineups); } catch (err) { console.error('lineups II/III:', err.message); }
   let pageSamples = STATIC.pageSamples;
   try { pageSamples = await capturePageSamples(club); } catch (err) { console.error('page samples failed:', err.message); }
   const fullE5 = fromClub(club);
   if (fullE5) { upcomingGames = fullE5; console.log(`upcoming E5: ${fullE5.length} games from the team calendar`); }
 
   const updated = { ...STATIC, boxscores, skaterRows, goalieRows, roster: finalRoster,
-                     leagueTable, leagueTables, leagueStats, clubTeamStats, clubGames, clubPlayers, logoFiles, club, pageSamples, runLog: RUN_LOG.slice(-400), teamRosters, upcomingGames, birthdays, nameDays, practiceExtras, lastRefreshed: new Date().toISOString() };
+                     leagueTable, leagueTables, leagueStats, clubTeamStats, clubGames, clubPlayers, clubLineups, logoFiles, club, pageSamples, runLog: RUN_LOG.slice(-400), teamRosters, upcomingGames, birthdays, nameDays, practiceExtras, lastRefreshed: new Date().toISOString() };
   fs.writeFileSync(file, JSON.stringify(updated) + '\n');
   console.log(`updated static-data.json: ${boxscores.length} games, latest ${boxscores[boxscores.length - 1].date}`);
 })().catch(err => { console.error('refresh failed, static-data.json left unchanged:', err.message); process.exit(1); });
