@@ -5,6 +5,26 @@ const DATA = window.__LIVE_DATA;
 const LV_COLOR = (DATA.teamAssets['Ledus Veči'] && DATA.teamAssets['Ledus Veči'].accent) || '#830C67';
 const DEFAULT_LOGO = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="none" stroke="%237C8A93" stroke-width="1.5"/></svg>');
 
+// ---- team logos: always looked up in the logos folder first ----
+// DATA.logoFiles (made by the refresh script) lists every file in the folder by a simplified name, so
+// "APARĀTI.png", "aparati.png" or "Aparati.png" all match the team "Aparāti". Old names used in the game
+// sheet are mapped to the names on the logo files below.
+const LOGO_ALIAS = { 'Warriors':'Ice Warriors', 'Ice Wolves II':'Ice Wolves', 'Iecava/Mammoths':'Mammoths', 'Leģendas V':'Pilsētas Leģendas',
+  'Sparta II':'Sparta 2', 'Moltto Plus':'Moltto', 'Cargo serviss':'Cargo Serviss' };
+const logoKeyOf = n => String(n || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+function logoFor(name){
+  const files = DATA.logoFiles || {};
+  for (const n of [name, LOGO_ALIAS[name]]) { const f = n && files[logoKeyOf(n)]; if (f) return f; }
+  return null;
+}
+// every DATA.teamAssets[...] lookup on the site goes through this, so the folder wins everywhere
+const RAW_ASSETS = DATA.teamAssets || {};
+DATA.teamAssets = new Proxy(RAW_ASSETS, { get(t, k) {
+  if (typeof k !== 'string') return t[k];
+  const own = t[k], f = logoFor(k);
+  if (!own && !f) return undefined;
+  return { ...(own || { accent: '#7C8A93' }), logo: f || (own && own.logo) || null };
+} });
 function teamInfo(name){
   return DATA.teamAssets[name] || {accent:'#7C8A93', logo: null};
 }
@@ -1495,7 +1515,7 @@ renderStatsTab();
       if (!g.date || fixed.some(f => f.div === div && f.date === g.date)) return;
       const home = g.home.abbr === t.abbr, o = home ? g.away : g.home, opp = (t.names || {})[o.abbr] || o.abbr;
       const sub = g.played ? `${home ? g.hg : g.ag}-${home ? g.ag : g.hg}` : [g.time, g.arena ? titleCase(g.arena) : ''].filter(Boolean).join(' · ');
-      fixed.push({ date: g.date, type: 'game', div, ha: home ? 'vs' : '@', opp, logo: (t.logos || {})[o.abbr] || null, sub, short: `${home ? 'vs' : 'at'} ${opp}`, text: `${div} · ${home ? 'vs' : 'at'} ${opp}${sub ? ' · ' + sub : ''}` });
+      fixed.push({ date: g.date, type: 'game', div, ha: home ? 'vs' : '@', opp, logo: logoFor(opp) || (t.logos || {})[o.abbr] || null, sub, short: `${home ? 'vs' : 'at'} ${opp}`, text: `${div} · ${home ? 'vs' : 'at'} ${opp}${sub ? ' · ' + sub : ''}` });
     });
   });
   const extras = DATA.practiceExtras || [];
@@ -1620,7 +1640,8 @@ renderStatsTab();
   const ord = n => n + (n === 1 ? 'st' : n === 2 ? 'nd' : n === 3 ? 'rd' : 'th');
   const shortDate = iso => { const [, m, d] = iso.split('-').map(Number); return `${d} ${MON[m - 1]}`; };
   const assetKey = {}; Object.keys(DATA.teamAssets || {}).forEach(k => assetKey[up(k)] = k);
-  const logoSrc = name => { const k = assetKey[up(name)] || assetKey[up(ALIAS[name])] || assetKey[up(ALIAS[nice(name)])]; return k ? teamLogo(k) : null; };
+  const logoSrc = name => { const f = logoFor(name) || logoFor(nice(name)); if (f) return f;
+    const k = assetKey[up(name)] || assetKey[up(ALIAS[name])] || assetKey[up(ALIAS[nice(name)])]; return k ? teamLogo(k) : null; };
   const logo = name => { const src = logoSrc(name); return src ? `<img class="tlogo" src="${src}" alt="">` : ''; };
   const chips = (names, on) => `<div class="grp-chips">${names.map((n, i) => `<button data-i="${i}" class="${i === on ? 'on' : ''}">${esc(n)}</button>`).join('')}</div>`;
   const parts = (bodies, on) => bodies.map((b, i) => `<div class="ov-part" data-i="${i}"${i === on ? '' : ' style="display:none"'}>${b}</div>`).join('');
@@ -1780,7 +1801,7 @@ renderStatsTab();
     const oppAbbr = nx ? ehlPersp(nx, t.abbr, names).oppAbbr : null;
     return { div, name: t.name, logo: ldvLogo, played, season: played, next,
       h2h: played.filter(p => p.oppAbbr === oppAbbr), h2hLink: false,
-      oppPlayed: oppGames(t.opponent, t), oppLogo: oppAbbr && t.logos ? t.logos[oppAbbr] || null : null, ehlUpcoming: games.filter(g => !g.played) };
+      oppPlayed: oppGames(t.opponent, t), oppLogo: (next && logoFor(next.opp)) || (oppAbbr && t.logos ? t.logos[oppAbbr] || null : null), ehlUpcoming: games.filter(g => !g.played) };
   }
 
   // ---- this week (Mon-Sun): games, the shared practice, players' birthdays and name days ----
@@ -2090,11 +2111,11 @@ document.getElementById('statsTeamSelect') && document.getElementById('statsTeam
     if (!t || !t.games) { view.innerHTML = '<div class="wrap"><div class="empty-note" style="padding:30px 0">Dati vēl nav ielādēti.</div></div>'; return; }
     const names = t.names || {}, logos = t.logos || {};
     const logoKey = n => String(n || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '');
-    const fileLogo = n => (DATA.logoFiles || {})[logoKey(n)] || null;
+    const fileLogo = n => logoFor(n);
     const prot = {}; ((DATA.clubGames && DATA.clubGames[div]) || []).forEach(p => prot[p.date] = p);
     const games = t.games.filter(g => g.date).sort((x, y) => x.date < y.date ? -1 : 1).map(g => {
       const home = g.home.abbr === t.abbr, o = home ? g.away : g.home, pr = prot[g.date] || null;
-      return { date: g.date, home, opp: names[o.abbr] || o.abbr, logo: logos[o.abbr] || fileLogo(names[o.abbr] || o.abbr), played: g.played,
+      return { date: g.date, home, opp: names[o.abbr] || o.abbr, logo: logoFor(names[o.abbr] || o.abbr) || logos[o.abbr] || null, played: g.played,
         us: home ? g.hg : g.ag, them: home ? g.ag : g.hg, r: g.played ? res(home ? g.hg : g.ag, home ? g.ag : g.hg) : null,
         time: g.time, arena: g.arena ? nice(g.arena) : '', link: g.protocol, pr, decided: pr ? pr.decided || '' : '',
         s: pr ? pr.shots.us : null, sa: pr ? pr.shots.them : null,
