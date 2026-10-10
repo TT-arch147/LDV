@@ -1855,7 +1855,8 @@ renderStatsTab();
       matchHtml = `<div class="match-top"><div><div class="match-label"><span class="div-badge">${t.div}</span><span class="league-group-title" style="margin:0">Next game</span></div>
           <div class="match-when">${[fmt(n.date), n.time, n.arena].filter(Boolean).join(' · ')}</div></div><span class="countdown">${cd}</span></div>
         <div class="match-teams">${side(...L)}<div class="match-vs">VS</div>${side(...R, true)}</div>
-        <div class="match-foot">${t.h2h.length ? `<span>Head-to-head <b>${w}-${l}</b></span>${lm ? `<span>Last meeting <b>${lm.us}-${lm.them}</b><span class="home-res ${lm.result}">${lm.result}</span>${otTag(lm.decided)} ${fmt(lm.date)} ${lm.date.slice(0, 4)}${lm.link ? ' · ' + boxLink(lm.link, 'Boxscore') : ''}</span>` : ''}` : '<span>First meeting</span>'}</div>`;
+        <div class="match-foot">${t.h2h.length ? `<span class="h2h-hover">Head-to-head <b>${w}-${l}</b><span class="h2h-pop"><span class="h2h-title">${t.h2h.length} ${t.h2h.length === 1 ? 'spēle' : 'spēles'}</span>${t.h2h.slice().reverse().map(p => { const [y, m, d] = String(p.date).split('-').map(Number);
+            return `<span class="h2h-row"><span class="d">${d}.${String(m).padStart(2, '0')}.${y}</span><span class="o">${p.home ? 'vs' : '@'} ${esc(p.opp)}</span><span class="s">${p.us}-${p.them}</span><span class="home-res ${p.result}">${p.result}</span>${otTag(p.decided)}</span>`; }).join('')}</span></span>${lm ? `<span>Last meeting <b>${lm.us}-${lm.them}</b><span class="home-res ${lm.result}">${lm.result}</span>${otTag(lm.decided)} ${fmt(lm.date)} ${lm.date.slice(0, 4)}${lm.link ? ' · ' + boxLink(lm.link, 'Boxscore') : ''}</span>` : ''}` : '<span>First meeting</span>'}</div>`;
     } else {
       matchHtml = `<div class="match-label"><span class="div-badge">${t.div}</span><span class="league-group-title" style="margin:0">Next game</span></div><div class="empty-note">No upcoming games in the EHL calendar yet</div>`;
     }
@@ -2121,7 +2122,18 @@ document.getElementById('statsTeamSelect') && document.getElementById('statsTeam
         s: pr ? pr.shots.us : null, sa: pr ? pr.shots.them : null,
         pim: pr ? pr.penalties.filter(x => x.side === 'us').reduce((s, x) => s + x.min, 0) : null,
         pimA: pr ? pr.penalties.filter(x => x.side === 'them').reduce((s, x) => s + x.min, 0) : null }; });
-    const played = games.filter(g => g.played), upcoming = games.filter(g => !g.played && g.date >= today);
+    // games from earlier seasons (history job) are added from the protocols; the pages show the current season,
+    // earlier seasons are reached with the season picker on the player page
+    Object.values(prot).forEach(pr => { if (!games.some(g => g.date === pr.date)) { const home = pr.ourSide ? pr.ourSide === 'home' : pr.home.abbr === t.abbr;
+      const o = home ? pr.away : pr.home; games.push({ date: pr.date, home, opp: o.name || names[o.abbr] || o.abbr, logo: logoFor(o.name || names[o.abbr] || o.abbr), played: pr.played,
+        us: home ? pr.hg : pr.ag, them: home ? pr.ag : pr.hg, r: pr.played ? res(home ? pr.hg : pr.ag, home ? pr.ag : pr.hg) : null, time: pr.time, arena: pr.arena ? nice(pr.arena) : '',
+        link: pr.protocol, pr, decided: pr.decided || '', s: pr.shots.us, sa: pr.shots.them,
+        pim: pr.penalties.filter(x => x.side === 'us').reduce((s, x) => s + x.min, 0), pimA: pr.penalties.filter(x => x.side === 'them').reduce((s, x) => s + x.min, 0) }); } });
+    games.sort((x, y) => x.date < y.date ? -1 : 1);
+    const seasonStart = d => { const [y, m] = d.split('-').map(Number); return m >= 8 ? y : y - 1; };
+    const curSeason = Math.max(0, ...games.filter(g => g.played).map(g => seasonStart(g.date)));
+    const allPlayed = games.filter(g => g.played);
+    const played = allPlayed.filter(g => seasonStart(g.date) === curSeason), upcoming = games.filter(g => !g.played && g.date >= today);
     const W = played.filter(g => g.r === 'W').length, L = played.filter(g => g.r === 'L').length, D = played.filter(g => g.r === 'D').length;
     const sum = k => played.reduce((s, g) => s + (g[k] || 0), 0), GF = sum('us'), GA = sum('them');
     // shots and penalty minutes: from the protocols, or from the EHL team stats page until protocols are read
@@ -2235,7 +2247,7 @@ document.getElementById('statsTeamSelect') && document.getElementById('statsTeam
     const playerView = (name, opts = {}) => {
       const p0 = players.find(x => x.name === name); if (!p0) return '';
       const hasVideo = pr => pr.goals.some(x => x.side === 'us' && x.video && (x.scorer === name || x.a1 === name || x.a2 === name));
-      const gamesFor = played.filter(g => inSeason(g.date, opts.season) && (!opts.hlOnly || (g.pr && hasVideo(g.pr))));
+      const gamesFor = (opts.season && opts.season !== 'ALL' ? allPlayed : (opts.season === 'ALL' ? allPlayed : played)).filter(g => inSeason(g.date, opts.season) && (!opts.hlOnly || (g.pr && hasVideo(g.pr))));
       let p = p0;
       if (played.some(g => g.pr)) {   // totals for the chosen season / filter, counted from the protocols
         const mine = gamesFor.filter(g => g.pr && g.pr.players.some(x => (x.name || x) === name));

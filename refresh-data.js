@@ -364,7 +364,7 @@ function parseProtocol(html, url, ourClubId) {
     video: (html.match(/<a href="(https:\/\/www\.youtube\.com\/embed\/[^"]+)"[^>]*>\s*SPĒLES VIDEO/i) || [])[1] || null,
     shots: { us: weHome ? num('stats_sog_a') : num('stats_sog_b'), them: weHome ? num('stats_sog_b') : num('stats_sog_a') },
     faceoffs: { us: weHome ? num('stats_foff_a') : num('stats_foff_b'), them: weHome ? num('stats_foff_b') : num('stats_foff_a') },
-    goals: [], penalties: [], goalies: [], players: [] };
+    goals: [], penalties: [], goalies: [], players: [], ourSide: weHome ? 'home' : 'away' };
   // events, period by period
   let period = 1;
   for (const blk of html.matchAll(/<span class="title">([^<]+)<\/span>[\s\S]*?<tbody>([\s\S]*?)<\/tbody>/g)) {
@@ -786,10 +786,17 @@ async function fetchPracticeExtras(previous) {
         if (old && !old.played && old.date > todayIso) continue;        // still in the future
         try { const gm = parseProtocol(await getHtml(url), url, OUR_CLUB[div]); if (gm) { known[url] = gm; read++; } } catch (e) { /* keep the old copy */ }
       }
+      // earlier seasons, collected once by the "Collect EHL history" job
+      try {
+        const hist = JSON.parse(fs.readFileSync(path.join(__dirname, 'history', 'club-games.json'), 'utf8'))[div] || [];
+        hist.forEach(gm => { if (gm && gm.protocol && !known[gm.protocol]) known[gm.protocol] = gm; });
+      } catch (e) { /* no history yet */ }
       clubGames[div] = Object.values(known).filter(gm => gm && gm.date).sort((a, b) => a.date < b.date ? -1 : 1);
       // player totals from the protocols (games played, goals, assists, penalty minutes, last number and position)
       const tot = {};
-      clubGames[div].filter(gm => gm.played).forEach(gm => gm.players.forEach(p => {
+      const seasonOf = d => { const [y, m] = d.split('-').map(Number); return m >= 8 ? y : y - 1; };
+      const curSeason = Math.max(...clubGames[div].filter(gm => gm.played).map(gm => seasonOf(gm.date)), 0);
+      clubGames[div].filter(gm => gm.played && seasonOf(gm.date) === curSeason).forEach(gm => gm.players.forEach(p => {
         const k = p.pid || p.name, t = tot[k] || (tot[k] = { name: p.name, ehl: p.ehl, pos: p.pos, nr: p.nr, gp: 0, g: 0, a: 0, pim: 0 });
         t.gp++; t.g += p.g; t.a += p.a; t.pim += p.pim; t.nr = p.nr ?? t.nr; t.pos = p.pos || t.pos; }));
       clubPlayers[div] = Object.values(tot);
