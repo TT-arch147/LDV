@@ -471,9 +471,10 @@ async function fetchClubLineups(previous) {
 // gives the opponent's last result and form. Team ids are looked up by name in the calendar's
 // team dropdown, so nothing has to be typed in by hand; the fallbacks below are used if that fails.
 const CLUB_TEAMS = [
-  { div: 'E5', name: 'Ledus Veči',     slug: 'ledus-veci',     fallbackId: '293', divisionId: '400' },
-  { div: 'E7', name: 'Ledus Veči II',  slug: 'ledus-veci-ii',  fallbackId: '334', divisionId: '402' },
-  { div: 'E9', name: 'Ledus Veči III', slug: 'ledus-veci-iii', fallbackId: '527', divisionId: '404' },
+  // fallbackId = club id (in /komandas/... links); seasonId = this season's team id, which the calendar's team filter uses
+  { div: 'E5', name: 'Ledus Veči',     slug: 'ledus-veci',     fallbackId: '293', seasonId: '3528', divisionId: '400' },
+  { div: 'E7', name: 'Ledus Veči II',  slug: 'ledus-veci-ii',  fallbackId: '334', seasonId: '3681', divisionId: '402' },
+  { div: 'E9', name: 'Ledus Veči III', slug: 'ledus-veci-iii', fallbackId: '527', seasonId: '3680', divisionId: '404' },
 ];
 const EHL = 'https://ehl.entuziasti.com';
 const plain = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
@@ -532,12 +533,13 @@ function parseTeamView(html) {
       const score = row.match(/<span class="score">(\d+):(\d+)<\/span>/);
       const prot = (row.match(/\/protokols\/(\d+)/) || [])[1] || null;
       const imgs = [...row.matchAll(/team_(\d+)\.png/g)].map(x => x[1]);
+      const titles = [...row.matchAll(/<a href="\/komandas\/[^"]+"[^>]*title="([^"]+)"/g)].map(x => x[1].replace(/&amp;/g, '&'));
       games.push({
         date, division: m[1].toUpperCase(),
         time: (row.match(/<td>(\d{1,2}:\d{2})<\/td>/) || [])[1] || null,
         arena: (row.match(/<div class="calendar_arena_block">([^<]+)<\/div>/) || [])[1] || null,
-        home: { abbr: abbrs[0], id: ids.length === 2 ? ids[0] : null, img: imgs.length === 2 ? imgs[0] : null },
-        away: { abbr: abbrs[1], id: ids.length === 2 ? ids[1] : null, img: imgs.length === 2 ? imgs[1] : null },
+        home: { abbr: abbrs[0], id: ids.length === 2 ? ids[0] : null, img: imgs.length === 2 ? imgs[0] : null, name: titles.length === 2 ? titles[0] : null },
+        away: { abbr: abbrs[1], id: ids.length === 2 ? ids[1] : null, img: imgs.length === 2 ? imgs[1] : null, name: titles.length === 2 ? titles[1] : null },
         played: !!score, hg: score ? +score[1] : null, ag: score ? +score[2] : null,
         protocol: prot ? `${EHL}/protokols/${prot}` : null,
       });
@@ -555,14 +557,15 @@ async function divisionCookie(divisionId) {
     return all.map(c => c.split(';')[0]).join('; ');
   } catch (e) { return ''; }
 }
-async function fetchTeamView(teamId, divisionId) {
-  const body = () => new URLSearchParams({ team: teamId, search: 'search' });
-  let html = await getHtml(CALENDAR_URL + '?_cb=' + Date.now(), { method: 'POST', body: body() });
-  if (!html.includes('team_review') && divisionId) {
-    const cookie = await divisionCookie(divisionId);
-    html = await getHtml(CALENDAR_URL + '?_cb=' + Date.now(), { method: 'POST', body: body(), headers: { ...BROWSER_HEADERS, ...(cookie ? { Cookie: cookie } : {}) } });
-  }
-  if (!html.includes('team_review')) {
+async function fetchTeamView(seasonTeamId, divisionId) {
+  // the calendar's team filter: <select name="team_div_id"> (this season's team id), sent with search=search,
+  // while the calendar is switched to the team's division (cookie)
+  const body = () => new URLSearchParams({ team_div_id: seasonTeamId, arena: '', month: '', search: 'search' });
+  const cookie = divisionId ? await divisionCookie(divisionId) : '';
+  const html = await getHtml(CALENDAR_URL + '?_cb=' + Date.now(), { method: 'POST', body: body(),
+    headers: { ...BROWSER_HEADERS, 'Content-Type': 'application/x-www-form-urlencoded', ...(cookie ? { Cookie: cookie } : {}) } });
+  const teamId = seasonTeamId;
+  if (!html.includes('id="main_calendar"') || !new RegExp(`value="${seasonTeamId}"\\s+selected`).test(html)) {
     console.log(`team view ${teamId}: page start:`, html.replace(/\s+/g, ' ').slice(0, 300));
     throw new Error('response did not look like the team-filtered view');
   }
@@ -598,23 +601,24 @@ async function fetchClubTeams(previous) {
   const out = {};
   for (const t of CLUB_TEAMS) {
     const id = t.fallbackId || prev[t.div]?.id || byName(t.name);   // club id (the dropdown now lists season ids)
+    const seasonId = byName(t.name) || t.seasonId;                  // this season's team id, for the calendar filter
     if (!id) { console.error(`club ${t.div}: team id not found (no "${t.name}" in the dropdown) - keeping previous`); if (prev[t.div]) out[t.div] = prev[t.div]; continue; }
     try {
-      const games = await fetchTeamView(id, t.divisionId);
+      const games = (await fetchTeamView(seasonId, t.divisionId)).filter(g => !/-07-/.test(g.date) || g.played);   // 1 July = placeholder date
       const abbr = mostCommonAbbr(games);
       const today = new Date().toISOString().slice(0, 10);
       const next = games.filter(g => !g.played && g.date && g.date >= today).sort((a, b) => a.date < b.date ? -1 : 1)[0];
       let opponent = prev[t.div]?.opponent || null;
       if (next) {
         const opp = next.home.abbr === abbr ? next.away : next.home;
-        const oppName = (opp.id && dir[opp.id]) ? niceName(dir[opp.id]) : (TEAM_ABBR[opp.abbr] || opp.abbr);
+        const oppName = opp.name ? niceName(opp.name) : (opp.id && dir[opp.id]) ? niceName(dir[opp.id]) : (TEAM_ABBR[opp.abbr] || opp.abbr);
         let oppGames = [];
-        if (opp.id) { try { oppGames = (await fetchTeamView(opp.id, t.divisionId)).filter(g => g.played); } catch (e) { console.error(`club ${t.div}: opponent view failed:`, e.message); } }
+        if (opp.img || opp.id) { try { oppGames = (await fetchTeamView(opp.img || opp.id, t.divisionId)).filter(g => g.played); } catch (e) { console.error(`club ${t.div}: opponent view failed:`, e.message); } }
         opponent = { id: opp.id, abbr: opp.abbr, name: oppName, games: oppGames };
       }
       // names for every team id seen, so the page can show full names instead of abbreviations
       const names = {};
-      games.concat(opponent?.games || []).forEach(g => [g.home, g.away].forEach(s => { if (s.id && dir[s.id]) names[s.abbr] = niceName(dir[s.id]); }));
+      games.concat(opponent?.games || []).forEach(g => [g.home, g.away].forEach(s => { if (s.name) names[s.abbr] = niceName(s.name); else if (s.id && dir[s.id]) names[s.abbr] = niceName(dir[s.id]); }));
       // logos: a file in the logos folder named after the team wins (logos/kalniesi.png), otherwise the EHL logo
       const logos = {};
       const fileSlug = n => plain(n).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
