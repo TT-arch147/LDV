@@ -1803,7 +1803,9 @@ renderStatsTab();
     const season = games.filter(b => b.season.includes(yrs)).map(persp);
     const next = up && { date: up.d, time: up.g.time, arena: up.g.arena ? tc(up.g.arena) : '', home: up.g.isHome, opp: up.g.opponent };
     const h2h = next ? played.filter(p => p.opp === next.opp || p.opp === ALIAS[next.opp]) : [];
-    const opp = CLUB.E5 && CLUB.E5.opponent && next && plain(CLUB.E5.opponent.name) === plain(next.opp) ? CLUB.E5.opponent : (CLUB.E5 && CLUB.E5.opponent);
+    // only when the saved opponent really is the next opponent (the saved copy can be from an earlier week)
+    const sameTeam = (x, y) => plain(x) === plain(y) || plain(ALIAS[x] || '') === plain(y) || plain(x) === plain(ALIAS[y] || '');
+    const opp = CLUB.E5 && CLUB.E5.opponent && next && sameTeam(CLUB.E5.opponent.name, next.opp) ? CLUB.E5.opponent : null;
     return { div: 'E5', name: 'Ledus Veči', logo: ldvLogo, played, season, next, h2h, h2hLink: true,
       oppPlayed: oppGames(opp, CLUB.E5), oppLogo: next ? knownLogo(next.opp) : null };
   }
@@ -1823,7 +1825,7 @@ renderStatsTab();
     const oppAbbr = nx ? ehlPersp(nx, t.abbr, names).oppAbbr : null;
     return { div, name: t.name, logo: ldvLogo, played, season: played, next,
       h2h: played.filter(p => p.oppAbbr === oppAbbr), h2hLink: false,
-      oppPlayed: oppGames(t.opponent, t), oppLogo: (next && logoFor(next.opp)) || (oppAbbr && t.logos ? t.logos[oppAbbr] || null : null), ehlUpcoming: games.filter(g => !g.played) };
+      oppPlayed: t.opponent && next && plain(t.opponent.name) === plain(next.opp) ? oppGames(t.opponent, t) : [], oppLogo: (next && logoFor(next.opp)) || (oppAbbr && t.logos ? t.logos[oppAbbr] || null : null), ehlUpcoming: games.filter(g => !g.played) };
   }
 
   // ---- this week (Mon-Sun): games, the shared practice, players' birthdays and name days ----
