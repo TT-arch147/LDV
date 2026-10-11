@@ -2529,7 +2529,7 @@ const FLIP_BACK_STYLE = 'stats';   // 'stats' (all numbers) or 'card' (hockey-ca
       if (style === 'card') { let back = card.querySelector('.hc-back-wrap'); if (!back) { back = document.createElement('div'); back.className = 'hc-back-wrap'; card.appendChild(back); } back.innerHTML = hockeyBack(card); }
       turn(card, style === 'card' ? 'back-card' : 'back-stats');
       setTimeout(() => { fb.textContent = card.classList.contains('back-card') || card.classList.contains('back-stats') ? '↻ Atpakaļ' : 'Visi rādītāji ↻'; }, 180); return; }
-    const tr = e.target.closest('#statsTable tbody tr');
+    const tr = e.target.closest('#statsTable tbody tr, .club-view .cl-gl tbody tr');
     if (tr && !tr.classList.contains('detail-row') && !e.target.closest('a')) { e.stopPropagation(); e.preventDefault(); turn(tr, 'flipped'); }
   }, true);
 })();

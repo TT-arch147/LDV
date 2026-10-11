@@ -1357,6 +1357,19 @@ footer{text-align:center;color:var(--text-faint);font-size:12px;padding:20px;}
   .club-view .scoreboard .result-badge{font-size:12px;}
 }
 @media (max-width:700px){ .club-view .scoreboard>div:last-child{padding-right:44px;} }
+
+/* ---- phone: Ledus Veči II / III games as flip cards too ---- */
+@media (max-width:700px){
+  .club-view .cl-gl tbody tr{cursor:pointer;position:relative;grid-template-columns:repeat(5,1fr);}
+  .club-view .cl-gl tbody tr:not(.flipped) td:nth-child(n+3){display:none !important;}
+  .club-view .cl-gl tbody tr:not(.flipped){padding:12px 4px;}
+  .club-view .cl-gl tbody tr.flipped{background:rgba(131,12,103,.08);border-radius:8px;}
+  .club-view .cl-gl tbody tr td:nth-child(1)::before{content:'↻';position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:13px;color:var(--text-faint);}
+  .club-view .cl-gl tbody tr.flipped td:nth-child(1)::before{top:14px;transform:none;}
+  .club-view .cl-gl tbody tr td:nth-child(2){padding-right:22px !important;font-weight:700;}
+  .club-view .cl-gl tbody tr td:nth-child(1){font-weight:700;}
+}
+@media (max-width:700px){ .club-view .cl-gl tbody tr td:nth-child(1),.club-view .cl-gl tbody tr td:nth-child(2){display:block !important;align-self:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;} .club-view .cl-gl tbody tr td:nth-child(2){text-align:right;white-space:normal !important;overflow:visible !important;} .club-view .cl-gl tbody tr td:nth-child(2) img{vertical-align:-4px;} }
 </style>
 </head>
 <body>
