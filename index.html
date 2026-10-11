@@ -1331,21 +1331,32 @@ footer{text-align:center;color:var(--text-faint);font-size:12px;padding:20px;}
 @media (max-width:700px){ .league-layout>*,.team-bottom-row>*,.cl-bottom>*{min-width:0 !important;} .league-groups-row,#leagueSwitchBox,.cl-league{width:100% !important;min-width:0 !important;max-width:100% !important;box-sizing:border-box;} #leagueSwitchBox .league-table td:first-child,.cl-league .league-table td:first-child{white-space:normal;} #leagueSwitchBox .league-table td,.cl-league .league-table td{padding:7px 4px !important;} #leagueSwitchBox .league-table th,.cl-league .league-table th{padding:6px 4px !important;font-size:11px !important;} }
 @media (max-width:700px){ #leagueSwitchBox,.cl-league{padding:8px !important;} #leagueSwitchBox .league-table,.cl-league .league-table{width:100% !important;table-layout:auto;} .team-league-col,.cl-table-next{padding:12px !important;} }
 
-/* ---- phone: player pickers in one row ---- */
+
+/* ---- phone: pickers and scoreboard ---- */
 @media (max-width:700px){
-  #statsView .filter-row,.club-view .cl-selects{display:flex !important;flex-wrap:nowrap !important;gap:6px !important;align-items:center;}
-  #statsView .filter-row #statsPlayerSelect,.club-view .cl-selects .cl-player{flex:1 1 auto !important;min-width:0;width:auto;font-size:13px;padding:8px 6px;}
-  #statsView .filter-row .season-dd,.club-view .cl-selects .season-dd{flex:0 0 auto;}
-  #statsView .filter-row .season-dd-btn,.club-view .cl-selects .season-dd-btn{min-width:0 !important;width:auto !important;padding:5px 6px !important;gap:4px;font-size:11px;}
-  #statsView .filter-row .season-dd-btn>span:nth-child(2),.club-view .cl-selects .season-dd-btn>span:nth-child(2){max-width:66px;white-space:normal;line-height:1.15;display:block;font-size:10.5px;text-align:left;}
-  #statsView .filter-row .season-dd-btn img,.club-view .cl-selects .season-dd-btn img{width:24px;height:24px;}
-  #statsView .filter-row .season-dd-btn .caret,.club-view .cl-selects .season-dd-btn .caret{display:none;}
-  #statsView .filter-row #statsTeamSelect,.club-view .cl-selects .cl-team{flex:0 0 74px !important;width:74px;font-size:12px;padding:8px 2px;}
-  /* highlight filter as a small ▶ toggle */
-  #statsView .filter-row .highlight-toggle,.club-view .cl-selects .highlight-toggle{flex:0 0 auto;font-size:0 !important;gap:4px;}
-  #statsView .filter-row .highlight-toggle::after,.club-view .cl-selects .highlight-toggle::after{content:'▶';font-size:13px;color:var(--cyan);}
-  .season-dd-menu{max-width:calc(100vw - 24px);}
+  /* Protokols: season on its own row, then ‹ game › in one row */
+  #boxView .game-nav,.club-view .cl-nav{display:grid !important;grid-template-columns:40px minmax(0,1fr) 40px;gap:8px !important;align-items:center;}
+  #boxView .game-nav .season-dd,.club-view .cl-nav .season-dd{grid-column:1 / -1;}
+  #boxView .game-nav .season-dd-btn,.club-view .cl-nav .season-dd-btn{width:100%;}
+  #boxView .game-nav #gameSelect,.club-view .cl-nav .cl-game{width:100%;min-width:0;flex:none !important;font-size:13px;}
+  #boxView .game-nav .nav-btn,.club-view .cl-nav .nav-btn{width:40px;height:40px;padding:0;}
+  /* player pickers: player on the first row, season + team + highlight on the second */
+  #statsView .filter-row,.club-view .cl-selects{display:grid !important;grid-template-columns:minmax(0,1fr) auto;gap:8px !important;align-items:center;}
+  #statsView .filter-row #statsPlayerSelect,.club-view .cl-selects .cl-player{grid-column:1 / -1;width:100%;}
+  #statsView .filter-row .season-dd-btn,.club-view .cl-selects .season-dd-btn{width:100%;min-width:0 !important;}
+  #statsView .filter-row #statsTeamSelect,.club-view .cl-selects .cl-team{min-width:0;font-size:13px;}
+  #statsView .filter-row .highlight-toggle,.club-view .cl-selects .highlight-toggle{grid-column:1 / -1;font-size:13px;}
+  /* scoreboard: season badge in the bottom-right corner; II / III sized like Ledus Veči */
+  .sb-season-logo{top:auto !important;bottom:10px !important;right:10px !important;width:40px !important;height:40px !important;}
+  .club-view .scoreboard .sb-row{gap:6px !important;flex-wrap:nowrap !important;}
+  .club-view .scoreboard .sb-team{flex:1 1 0;min-width:0;}
+  .club-view .scoreboard .sb-team img,.club-view .scoreboard .sb-team .ph-logo{width:34px !important;height:34px !important;font-size:12px !important;}
+  .club-view .scoreboard .sb-team-name{font-size:12px !important;margin-top:4px !important;overflow-wrap:anywhere;}
+  .club-view .scoreboard .sb-row>div:nth-child(2){font-size:30px !important;margin:0 4px !important;white-space:nowrap;}
+  .club-view .scoreboard .sb-meta{font-size:12px;}
+  .club-view .scoreboard .result-badge{font-size:12px;}
 }
+@media (max-width:700px){ .club-view .scoreboard>div:last-child{padding-right:44px;} }
 </style>
 </head>
 <body>
