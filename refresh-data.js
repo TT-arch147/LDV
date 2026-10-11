@@ -392,9 +392,11 @@ function parseProtocol(html, url, ourClubId) {
   const titles = [...html.matchAll(/<span class="title">([^<]+)<\/span>/g)].map(m => m[1].trim());
   const pdata = strip((html.match(/id="periodData">([\s\S]*?)<\/div>\s*<div class="score/) || [])[1] || '');
   const so = titles.some(x => /metien|bull|shoot|\bSO\b/i.test(x)) || /\bSO\b|metien/i.test(pdata);
-  const ot = !so && (titles.some(x => /papild|\bOT\b/i.test(x)) || /\bOT\b|papild/i.test(pdata) || g.goals.some(x => x.period >= 4));
+  // regulation = 3 x 15 min, so a goal after 45:00 is an overtime goal (EHL lists it under the 3rd period)
+  const lateGoal = g.goals.some(x => { const [m, s] = String(x.time).split(':').map(Number); return m * 60 + (s || 0) > 45 * 60; });
+  const ot = !so && (titles.some(x => /papild|\bOT\b/i.test(x)) || /\bOT\b|papild/i.test(pdata) || g.goals.some(x => x.period >= 4) || lateGoal);
   g.decided = so ? 'SO' : ot ? 'OT' : '';
-  g.v = 3;   // reader version: older copies (wrong video link, no OT/SO, no MVP) get read again once
+  g.v = 4;   // reader version: older copies get read again once (v4: overtime goals after 45:00)
   // our players' stats table (number, position, G, A, P, PIM)
   for (const tb of html.matchAll(/<table class="protocol-stats"><thead><tr><th[^>]*>#<\/th><th class="img-inlcuded"><a href="\/komandas\/[^"\/]+\/(\d+)"[\s\S]*?<tbody>([\s\S]*?)<\/tbody>/g)) {
     if (tb[1] !== String(ourClubId)) continue;
@@ -834,7 +836,7 @@ async function fetchPracticeExtras(previous) {
       let read = 0;
       for (const url of urls) {
         const old = known[url];
-        if (old && old.v === 3 && old.played && old.date < weekAgo) continue;   // finished, settled, read with the current reader
+        if (old && old.v === 4 && old.played && old.date < weekAgo) continue;   // finished, settled, read with the current reader
         if (old && !old.played && old.date > todayIso) continue;        // still in the future
         try { const gm = parseProtocol(await getHtml(url), url, OUR_CLUB[div]); if (gm) { known[url] = gm; read++; } } catch (e) { /* keep the old copy */ }
       }

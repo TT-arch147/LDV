@@ -1861,7 +1861,7 @@ renderStatsTab();
   const boxLink = (link, label) => !link ? '' : link.startsWith('#box:')
     ? `<a href="#stats" data-boxdate="${link.slice(5)}">${label}</a>` : `<a href="${link}" target="_blank" rel="noopener">${label}</a>`;
   const resRow = (logo, name, p) => !p ? '' : `<div class="res-row">${logoHtml(logo, name, 30)}<div style="min-width:0">
-      <div class="line">${esc(name === 'Ledus Veči' || name.startsWith('Ledus Veči ') ? '' : name + ' ')}${p.home ? 'vs' : 'at'} ${esc(p.opp)} ${p.us}-${p.them}<span class="home-res ${p.result}">${p.result}</span>${otTag(p.decided)}</div>
+      <div class="line">${name === 'Ledus Veči' || name.startsWith('Ledus Veči ') ? '' : `<span class="tn">${esc(name)}</span> `}${p.home ? 'vs' : '@'} <span class="tn">${esc(p.opp)}</span> ${p.us}-${p.them}<span class="home-res ${p.result}">${p.result}</span>${otTag(p.decided)}</div>
       <div class="home-sub">${fmt(p.date)}${p.link ? ' · ' + boxLink(p.link, 'Boxscore') : ''}</div></div></div>`;
 
   function block(t){
