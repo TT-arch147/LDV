@@ -867,7 +867,7 @@ function openPlayerInTeam(div, name){
   window.scrollTo(0, 0);
 }
 const teamSelectHtml = (name, ehl, current) => { let teams = playerTeams(name, ehl); if (current !== 'E5') teams = teams.filter(d => d !== 'E5'); if (!teams.includes(current)) teams.unshift(current);
-  return teams.map(d => `<option value="${d}"${d === current ? ' selected' : ''}>${TEAM_LABEL[d]} (${d})</option>`).join(''); };
+  return teams.map(d => `<option value="${d}"${d === current ? ' selected' : ''}>${d} · ${TEAM_LABEL[d]}</option>`).join(''); };
 
 
 // overtime / shootout: E5 from the game sheet (OT period played; goals in OT = OT, none = shootout),
@@ -903,6 +903,10 @@ function oppCell(r){
   return `<span class="opp-cell"><span class="ha">${ha}</span>${info && info.logo ? `<img src="${teamLogo(OPP_ALIAS[r.opponent] || r.opponent)}" alt="">` : ''}${r.opponent}</span>`;
 }
 
+function labelStatsCells(){
+  const heads = [...document.querySelectorAll('#statsTableHead th')].map(th => th.textContent.replace(/[▲▼]/g, '').trim());
+  document.querySelectorAll('#statsTable tbody tr').forEach(tr => { if (tr.children.length < 3) return; [...tr.children].forEach((td, i) => { td.dataset.label = heads[i] || ''; }); });
+}
 function renderStatsTab(){
   (function(){ const ts = document.getElementById('statsTeamSelect'); if (!ts) return; const n = statsPlayerSelect.value;
     ts.innerHTML = teamSelectHtml(n, null, 'E5'); ts.style.display = ts.options.length > 1 ? '' : 'none';
@@ -953,6 +957,8 @@ function renderStatsTab(){
 }
 
 let STATS_TEAM = 'E5';   // team chosen in the Player stats team picker
+new MutationObserver(labelStatsCells).observe(document.querySelector('#statsTable tbody'), { childList: true });
+labelStatsCells();
 statsPlayerSelect.addEventListener('change', ()=>{ STATS_TEAM = 'E5'; statsSortState = {key:'date', dir:-1}; renderStatsTab(); });
 statsSeasonSelect.addEventListener('change', renderStatsTab);
 statsHighlightOnly.addEventListener('change', renderStatsTab);
@@ -1606,7 +1612,8 @@ renderStatsTab();
     for (let d = 1; d <= days; d++) {
       const ds = iso(viewY, viewM, d), ev = eventsOn(ds);
       const cls = ['cal-day', ds === todayIso ? 'today' : '', ds === selected ? 'sel' : '', ds < todayIso ? 'past' : ''].filter(Boolean).join(' ');
-      html += `<button class="${cls}" data-date="${ds}"><span class="cal-num">${d}</span>
+      const WDL = ['Svētdiena','Pirmdiena','Otrdiena','Trešdiena','Ceturtdiena','Piektdiena','Sestdiena'][new Date(viewY, viewM, d).getDay()];
+      html += `<button class="${cls}${ev.length ? ' has-ev' : ''}" data-date="${ds}"><span class="cal-num">${d}</span><span class="cal-wd">${WDL}</span>
         <span class="cal-items">${ev.map(e => cellItem(e, ev.length === 1)).join('')}</span>
         <span class="cal-dots">${ev.map(e => `<span class="cal-dot t-${e.type === 'game' ? e.div : e.type}"></span>`).join('')}</span></button>`;
     }
@@ -2476,6 +2483,55 @@ document.getElementById('statsTeamSelect') && document.getElementById('statsTeam
         view.querySelector('.cl-pview').innerHTML = (src && src._playerView && src._playerView(name, view._opts())) || ''; }
     });
   });
+})();
+
+// ---------------- phone: flip cards ----------------
+// Player card: front = photo, name, details and the four main numbers; a button in the top-right corner turns it
+// over. Back = every number (option A, "stats") or a hockey-card style back with season lines (option B, "card").
+// Games: front = date and opponent; tap to turn over to all of that game's numbers.
+const FLIP_BACK_STYLE = 'stats';   // 'stats' (all numbers) or 'card' (hockey-card back)
+(function(){
+  const phone = () => window.matchMedia('(max-width: 700px)').matches;
+  const turn = (el, cls) => { el.classList.add('flipping'); setTimeout(() => el.classList.toggle(cls), 170); setTimeout(() => el.classList.remove('flipping'), 360); };
+  // season lines for the hockey-card back: Ledus Veči seasons from the game sheet, II / III from the protocols
+  function seasonLines(name){
+    const rows = [];
+    const bySeason = {};
+    DATA.skaterRows.filter(r => r.player === name).forEach(r => { const k = r.season; const t = bySeason[k] || (bySeason[k] = { gp: 0, g: 0, a: 0, pim: 0 }); t.gp++; t.g += r.g || 0; t.a += r.a || 0; t.pim += r.pim || 0; });
+    Object.entries(bySeason).forEach(([k, t]) => { const y = (k.match(/(\d{2})(\d{2})-\d{2}(\d{2})/) || []); const yrs = (k.match(/\d{4}-\d{4}/) || [''])[0];
+      rows.push({ yrs, part: /playoff/i.test(k) ? 'PO' : 'RS', team: 'LDV', ...t }); });
+    ['E7', 'E9'].forEach(div => { const t0 = {}; ((DATA.clubGames || {})[div] || []).filter(g => g.played).forEach(g => {
+      const p = g.players.find(x => x.name === name); if (!p) return; const [y, m] = g.date.split('-').map(Number), s = m >= 8 ? y : y - 1, k = `${s}-${s + 1}`;
+      const t = t0[k] || (t0[k] = { gp: 0, g: 0, a: 0, pim: 0 }); t.gp++; t.g += p.g; t.a += p.a; t.pim += p.pim; });
+      Object.entries(t0).forEach(([yrs, t]) => rows.push({ yrs, part: 'RS', team: div === 'E7' ? 'LV2' : 'LV3', ...t })); });
+    return rows.sort((x, y) => x.yrs < y.yrs ? 1 : x.yrs > y.yrs ? -1 : x.team.localeCompare(y.team));
+  }
+  function hockeyBack(card){
+    const name = (card.querySelector('.card-name') || {}).textContent || ''; const meta = [...(card.querySelector('.card-meta') || { children: [] }).children].map(x => x.textContent.trim()).filter(Boolean).join(' · ');
+    const rows = seasonLines(name.trim()), tot = rows.reduce((s, r) => ({ gp: s.gp + r.gp, g: s.g + r.g, a: s.a + r.a, pim: s.pim + r.pim }), { gp: 0, g: 0, a: 0, pim: 0 });
+    return `<div class="hc-back"><div class="hc-band"><span>${name.trim()}</span><small>${meta.replace(/\s+/g, ' ').trim()}</small></div>
+      <table class="hc-table"><tr><th>Sezona</th><th>Kom.</th><th>GP</th><th>G</th><th>A</th><th>P</th><th>PIM</th></tr>
+      ${rows.map(r => `<tr><td>${r.yrs.replace(/^20(\d\d)-20(\d\d)$/, '$1/$2')} ${r.part}</td><td>${r.team}</td><td>${r.gp}</td><td>${r.g}</td><td>${r.a}</td><td><b>${r.g + r.a}</b></td><td>${r.pim}</td></tr>`).join('')}
+      <tr class="hc-tot"><td colspan="2">Karjera</td><td>${tot.gp}</td><td>${tot.g}</td><td>${tot.a}</td><td><b>${tot.g + tot.a}</b></td><td>${tot.pim}</td></tr></table>
+      <div class="hc-foot">Ledus Veči · EHL</div></div>`;
+  }
+  function setup(card){
+    if (!card || card.querySelector('.flip-btn')) return;
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'flip-btn'; b.textContent = 'Visi rādītāji ↻'; card.appendChild(b);
+  }
+  const prep = () => { if (!phone()) return; document.querySelectorAll('#statsView .player-card, .club-view .player-card').forEach(setup); };
+  new MutationObserver(prep).observe(document.body, { childList: true, subtree: true });
+  prep();
+  document.addEventListener('click', e => {
+    if (!phone()) return;
+    const fb = e.target.closest('.flip-btn');
+    if (fb) { const card = fb.closest('.player-card'); const style = card.dataset.backStyle || FLIP_BACK_STYLE;
+      if (style === 'card') { let back = card.querySelector('.hc-back-wrap'); if (!back) { back = document.createElement('div'); back.className = 'hc-back-wrap'; card.appendChild(back); } back.innerHTML = hockeyBack(card); }
+      turn(card, style === 'card' ? 'back-card' : 'back-stats');
+      setTimeout(() => { fb.textContent = card.classList.contains('back-card') || card.classList.contains('back-stats') ? '↻ Atpakaļ' : 'Visi rādītāji ↻'; }, 180); return; }
+    const tr = e.target.closest('#statsTable tbody tr');
+    if (tr && !tr.classList.contains('detail-row') && !e.target.closest('a')) { e.stopPropagation(); e.preventDefault(); turn(tr, 'flipped'); }
+  }, true);
 })();
 
 // ---------------- Latvian ----------------

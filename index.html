@@ -3,16 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" id="vp" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<script>
-  // Phones and small tablets: show the same desktop design, scaled down to fit the screen
-  // (instead of the stacked mobile layout). Pinch-zoom still works.
-  (function(){
-    var DESIGN_WIDTH = 1280;
-    if (window.innerWidth < DESIGN_WIDTH && Math.min(screen.width, window.outerWidth || screen.width) < DESIGN_WIDTH) {
-      document.getElementById('vp').setAttribute('content', 'width=' + DESIGN_WIDTH + ', viewport-fit=cover');
-    }
-  })();
-</script>
+<!-- phones get their own layout (see "PHONE LAYOUT" in the styles), so no scaling here -->
 <title>Ledus Veči Spēļu protokols</title>
 <link rel="icon" type="image/png" href="logos/ledus-veci.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1118,6 +1109,243 @@ footer{text-align:center;color:var(--text-faint);font-size:12px;padding:20px;}
 .match-foot .h2h-pop .h2h-row .home-res{display:inline-block;text-align:center;margin:0;}
 .match-foot .h2h-pop .h2h-row .ot-tag{display:inline-block;margin:0;justify-self:start;width:auto;}
 .res-row .line .tn{text-transform:uppercase;}
+
+/* =================== PHONE LAYOUT (screens up to 700 px) =================== */
+.cal-wd{display:none;}
+@media (max-width:700px){
+  :root{--gutter:12px;}
+  body{font-size:15px;}
+  #live-banner{display:none !important;}
+  /* header: smaller brand, menu as a swipeable row */
+  .topbar{padding:14px 0 10px;}
+  .topbar-inner{flex-direction:column;align-items:stretch;gap:10px;}
+  .brand img{width:46px !important;height:46px !important;}
+  .brand{font-size:30px !important;}
+  nav.tabs{display:flex;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;flex-wrap:nowrap;}
+  .main-btn{flex:0 0 auto;font-size:14px !important;padding:9px 14px !important;}
+  .subtabs{gap:16px;padding-top:8px;scrollbar-width:none;}
+  .subtabs .tab-btn,.club-view .subtabs .ctab{font-size:14px;flex:0 0 auto;}
+  .panel{padding:14px;border-radius:12px;}
+  h2{font-size:17px;}
+  /* Home */
+  .team-block{padding:10px;}
+  .home-top{grid-template-columns:1fr;gap:10px;}
+  .home-top .match{padding:14px;}
+  .home-top .match-name{font-size:24px;white-space:normal;}
+  .home-top .match-team img,.home-top .match-team .ph-logo{width:52px !important;height:52px !important;}
+  .match-foot{flex-direction:column;align-items:flex-start;gap:6px;}
+  .match-foot .h2h-pop{min-width:0;width:calc(100vw - 48px);}
+  .combo .grp-chips{flex-wrap:nowrap;overflow-x:auto;}
+  .combo .grp-chips button{flex:0 0 auto;font-size:13px;padding:6px 12px;}
+  .combo .res-row .line{font-size:18px;}
+  .combo .home-big{font-size:24px;}
+  /* stats pages */
+  .ov-head{padding-top:10px;}
+  .ov-title{font-size:24px;}
+  .ov-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%;margin-left:0;}
+  .ov-stat{padding:10px 6px;}
+  .ov-grid,.bx-pair,.ts-pair,.cl-two,.cl-bottom,.league-layout,.team-bottom-row{grid-template-columns:1fr !important;display:grid;gap:12px;}
+  .team-bottom-row .team-totals-col{width:auto;}
+  .league-layout .calendar-section{border-left:none;padding:12px 0 0;border-top:1px solid var(--line);}
+  .ovt,.league-table,.cl-totals,#teamTotalsTable{font-size:13px;}
+  .scroll-x,.table-scroll,.team-gamelog-col{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  #leagueSwitchBox .league-table,.cl-league .league-table{font-size:15px;}
+  #leagueSwitchBox .league-logo,.cl-league .league-logo{width:28px;height:28px;margin-right:8px;}
+  .team-stats-row.gamelog-row{flex-direction:column;}
+  .team-wl-col{display:none;}
+  .rec2{flex-direction:column;gap:18px;}
+  .rec-ring{width:150px;height:150px;} .rec-ring>div{width:116px;height:116px;} .rec-ring b{font-size:30px;}
+  .rec-gp b{font-size:40px;} .rec-goals .t b{font-size:28px;}
+  .pr-grid{grid-template-columns:1fr !important;gap:12px;}
+  /* boxscore + player card */
+  .game-nav,.cl-nav{flex-wrap:wrap;gap:8px;}
+  .game-nav select,.cl-nav .cl-game{flex:1 1 100%;min-width:0;}
+  .scoreboard{padding:18px 10px;}
+  .player-card .card-top-row{flex-direction:column;align-items:center;text-align:center;}
+  .card-photo,.cl-photo{width:160px !important;}
+  .card-meta{justify-content:center;flex-wrap:wrap;}
+  .card-stat-row{flex-wrap:wrap;justify-content:center;gap:10px 18px;}
+  .card-radar-box{display:none;}
+  .filter-row,.cl-selects{flex-wrap:wrap;gap:8px;}
+  .filter-row select,.cl-selects select{flex:1 1 45%;min-width:0;}
+  /* roster: one card per row */
+  .roster-grid,.cl-roster{grid-template-columns:1fr !important;}
+  /* rink: lines stacked, smaller boxes */
+  .rink{aspect-ratio:auto !important;padding:16px 8px 20px !important;background-size:100% 100% !important;}
+  .rink-row.show{position:static !important;display:grid !important;grid-template-columns:1fr !important;gap:8px;margin:0 0 8px !important;}
+  .rink-row.show .slot{position:static !important;transform:none !important;width:auto !important;min-height:0 !important;grid-template-columns:56px 1fr !important;}
+  .rink-row.show .slot .slot-photo{width:56px !important;height:56px !important;}
+  .lineup-head{flex-wrap:wrap;gap:8px;}
+  #lineChips button,.cl-lines button{min-width:0;padding:7px 12px;font-size:13px;}
+  /* calendar: a list of days that have something on */
+  .cal-layout{display:block;}
+  .cal-head{flex-wrap:wrap;gap:8px;}
+  .cal-filters{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;}
+  .cal-filters .cal-chip{flex:0 0 auto;}
+  .cal-grid{display:flex !important;flex-direction:column;gap:8px;}
+  .cal-dow,.cal-day.blank,.cal-day:not(.has-ev){display:none !important;}
+  .cal-day{display:grid !important;grid-template-columns:62px 1fr;align-items:start;min-height:0 !important;padding:10px !important;text-align:left;}
+  .cal-day .cal-num{grid-row:1;grid-column:1;font-size:22px;font-weight:700;}
+  .cal-day .cal-wd{display:block;grid-row:2;grid-column:1;font-size:11px;color:var(--text-dim);}
+  .cal-day .cal-items{grid-row:1 / span 2;grid-column:2;display:flex !important;flex-direction:column;gap:6px;}
+  .cal-day .cal-dots{display:none !important;}
+  .ce,.ce.solo{flex-direction:row !important;justify-content:flex-start !important;gap:10px !important;padding:8px 10px !important;}
+  .ce .ce-top{flex:0 0 auto;}
+  .ce .ce-sub,.ce.solo .ce-sub{font-size:13px !important;text-align:left;}
+  .ce.solo .ce-logo,.ce.solo .ce-ini{width:34px !important;height:34px !important;}
+  .ce.solo .ce-ic,.ce-ic{width:34px !important;height:31px !important;}
+  .ce-t.solo{flex-direction:row !important;}
+  .ce-t.solo .ce-pi{width:20px !important;height:20px !important;}
+  /* sponsors */
+  .sponsor-row{grid-template-columns:1fr 1fr !important;}
+}
+
+/* ---- phone: player page ---- */
+@media (max-width:700px){
+  /* header like a roster card: photo left, details right */
+  #statsView .player-card .card-top-row,.club-view .player-card .card-top-row{display:grid !important;grid-template-columns:104px 1fr;align-items:start;text-align:left;gap:14px;}
+  #statsView .card-photo,.club-view .card-photo{width:104px !important;height:auto;grid-row:1 / span 2;border-radius:12px;}
+  #statsView .card-body,.club-view .card-body{display:contents;}
+  #statsView .card-name,.club-view .card-name{grid-column:2;font-size:24px;line-height:1.1;}
+  #statsView .card-meta,.club-view .card-meta{justify-content:flex-start;}
+  #statsView .card-ehl,.club-view .card-ehl{grid-column:2;}
+  /* numbers: an even grid of tiles under the header */
+  #statsView .card-stats,.club-view .card-stats{grid-column:1 / -1;margin-top:12px;padding-top:12px;}
+  #statsView .card-stat-row,.club-view .card-stat-row{display:grid !important;grid-template-columns:repeat(4,1fr);gap:8px !important;margin-bottom:8px;}
+  #statsView .card-stat,.club-view .card-stat{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 2px;min-width:0;text-align:center;}
+  #statsView .card-stat-num,.club-view .card-stat-num{font-size:20px;}
+  /* radar: back, smaller, under the numbers */
+  #statsView .card-radar-box{display:block !important;grid-column:1 / -1;max-width:300px;margin:6px auto 0;}
+  /* game list: one card per game, every number labelled */
+  #statsTable thead{display:none;}
+  #statsTable,#statsTable tbody{display:block;width:100%;min-width:0 !important;}
+  #statsTable tbody tr{display:grid;grid-template-columns:repeat(4,1fr);gap:6px 4px;padding:10px 4px;border-bottom:1px solid var(--line);}
+  #statsTable tbody tr td{display:flex;flex-direction:column-reverse;align-items:center;border:none !important;padding:2px !important;font-size:15px;font-weight:600;min-width:0;}
+  #statsTable tbody tr td::after{content:attr(data-label);font-size:10px;font-weight:500;color:var(--text-dim);text-transform:uppercase;letter-spacing:.3px;}
+  #statsTable tbody tr td:nth-child(1){grid-column:1 / 3;align-items:flex-start;font-size:13px;color:var(--text-dim);}
+  #statsTable tbody tr td:nth-child(2){grid-column:3 / 5;align-items:flex-end;}
+  #statsTable tbody tr td:nth-child(1)::after,#statsTable tbody tr td:nth-child(2)::after{content:none;}
+  #statsTable tbody tr.detail-row,#statsTable tbody tr[class*="detail"]{display:block;}
+  #statsTable tbody tr.detail-row td,#statsTable tbody tr[class*="detail"] td{display:block;}
+  #statsTable tbody tr.detail-row td::after,#statsTable tbody tr[class*="detail"] td::after{content:none;}
+  /* II / III game list the same way */
+  .club-view .cl-gl thead{display:none;}
+  .club-view .cl-gl,.club-view .cl-gl tbody{display:block;width:100%;}
+  .club-view .cl-gl tbody tr{display:grid;grid-template-columns:repeat(5,1fr);gap:6px 4px;padding:10px 4px;border-bottom:1px solid var(--line);}
+  .club-view .cl-gl tbody td{display:flex;flex-direction:column-reverse;align-items:center;border:none !important;padding:2px !important;font-weight:600;}
+  .club-view .cl-gl tbody td:nth-child(1){grid-column:1 / 3;align-items:flex-start;font-size:13px;color:var(--text-dim);}
+  .club-view .cl-gl tbody td:nth-child(2){grid-column:3 / 6;align-items:flex-end;}
+  .club-view .cl-gl tbody td:nth-child(3)::after{content:'G'} .club-view .cl-gl tbody td:nth-child(4)::after{content:'A'}
+  .club-view .cl-gl tbody td:nth-child(5)::after{content:'P'} .club-view .cl-gl tbody td:nth-child(6)::after{content:'PPG'} .club-view .cl-gl tbody td:nth-child(7)::after{content:'PIM'}
+  .club-view .cl-gl tbody td::after{font-size:10px;font-weight:500;color:var(--text-dim);}
+}
+
+@media (max-width:700px){
+  #statsView .player-card .card-top-row,.club-view .player-card .card-top-row{grid-template-rows:auto auto auto 1fr;align-content:start;row-gap:6px;}
+  #statsView .card-photo,.club-view .card-photo{grid-row:1 / span 4 !important;}
+  #statsView .card-name,.club-view .card-name{grid-row:1;}
+  #statsView .card-meta,.club-view .card-meta{grid-column:2;grid-row:2;font-size:13px;gap:6px;}
+  #statsView .card-ehl,.club-view .card-ehl{grid-row:3;margin:0;}
+  #statsView .card-stats,.club-view .card-stats{grid-row:5;}
+  #statsView .card-radar-box{grid-row:6;max-height:300px;}
+  #statsView .card-stat-row,.club-view .card-stat-row{grid-template-columns:repeat(3,1fr) !important;}
+  #statsView .filter-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  #statsView .filter-row #statsPlayerSelect{grid-column:1 / -1;}
+  #statsView .filter-row .season-dd,#statsView .filter-row #statsTeamSelect{min-width:0;}
+  #statsView .filter-row .season-dd-btn{min-width:0;width:100%;}
+  #statsView .filter-row .highlight-toggle{grid-column:1 / -1;}
+}
+
+/* ---- phone: flip cards ---- */
+@keyframes ldvFlip{0%{transform:rotateY(0)}50%{transform:rotateY(90deg)}100%{transform:rotateY(0)}}
+@media (max-width:700px){
+  .flipping{animation:ldvFlip .35s ease;}
+  #statsView .player-card,.club-view .player-card{position:relative;min-height:0 !important;padding-top:48px !important;}
+  .flip-btn{position:absolute;top:12px;right:12px;z-index:2;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:999px;padding:5px 12px;font:600 12px 'Inter',sans-serif;cursor:pointer;}
+  .flip-btn:active{border-color:var(--ice);}
+  /* front: the four main numbers, big and coloured */
+  #statsView .player-card:not(.back-stats) .card-stat-row:first-child .card-stat:nth-child(n+5),
+  #statsView .player-card:not(.back-stats) .card-stat-row:not(:first-child),
+  .club-view .player-card:not(.back-stats) .card-stat-row:first-child .card-stat:nth-child(n+5),
+  .club-view .player-card:not(.back-stats) .card-stat-row:not(:first-child){display:none !important;}
+  #statsView .player-card:not(.back-stats) .card-stat-row:first-child,.club-view .player-card:not(.back-stats) .card-stat-row:first-child{grid-template-columns:repeat(4,1fr) !important;margin:0;}
+  .player-card:not(.back-stats) .card-stat-row:first-child .card-stat{background:linear-gradient(180deg,rgba(131,12,103,.28),rgba(131,12,103,.08)) !important;border-color:rgba(131,12,103,.55) !important;padding:12px 2px !important;}
+  .player-card:not(.back-stats) .card-stat-row:first-child .card-stat-num{font-size:28px !important;}
+  .player-card:not(.back-stats) .card-stat-row:first-child .card-stat:nth-child(4) .card-stat-num{color:#E07AC9;}
+  #statsView .player-card .card-radar-box{display:none !important;}
+  /* back, option A: only the numbers (+ radar), no photo or details */
+  .player-card.back-stats .card-photo,.player-card.back-stats .card-name,.player-card.back-stats .card-meta,.player-card.back-stats .card-ehl{display:none !important;}
+  #statsView .player-card.back-stats .card-top-row,.club-view .player-card.back-stats .card-top-row{display:block !important;}
+  .player-card.back-stats .card-stats{margin:0 !important;padding:0 !important;border:none !important;}
+  /* the radar on the back (Ledus Veči); II / III have no radar, so their back stays as short as the numbers */
+  #statsView .player-card.back-stats .card-radar-box{display:block !important;width:100%;max-width:320px;height:240px;margin:10px auto 0;}
+  /* back, option B: hockey-card back */
+  .hc-back-wrap{display:none;}
+  #statsView .player-card.back-card .card-top-row,.club-view .player-card.back-card .card-top-row{display:none !important;}
+  .player-card.back-card .hc-back-wrap{display:block;}
+  .hc-back{border:2px solid var(--ice);border-radius:12px;overflow:hidden;background:linear-gradient(180deg,#141b24,#0f151c);}
+  .hc-band{background:linear-gradient(90deg,var(--ice),#5b0a48);padding:10px 12px;display:flex;flex-direction:column;}
+  .hc-band span{font-family:'Oswald',sans-serif;font-size:20px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:#fff;}
+  .hc-band small{font-size:11.5px;color:#f1d6ea;}
+  .hc-table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums;}
+  .hc-table th{font-size:10.5px;color:var(--text-dim);text-transform:uppercase;padding:7px 4px;border-bottom:1px solid var(--line);text-align:center;}
+  .hc-table td{padding:7px 4px;text-align:center;border-bottom:1px solid rgba(255,255,255,.05);}
+  .hc-table td:first-child,.hc-table th:first-child{text-align:left;padding-left:10px;}
+  .hc-table tr:nth-child(even) td{background:rgba(255,255,255,.025);}
+  .hc-table tr.hc-tot td{font-weight:700;border-top:2px solid var(--ice);background:rgba(131,12,103,.15);}
+  .hc-foot{font:600 10px 'Oswald',sans-serif;letter-spacing:1.5px;color:var(--text-faint);text-align:right;padding:6px 10px;text-transform:uppercase;}
+  /* games: front = date and opponent only; back = every number, labelled */
+  #statsTable tbody tr{cursor:pointer;position:relative;}
+  #statsTable tbody tr:not(.flipped) td:nth-child(n+3){display:none !important;}
+  #statsTable tbody tr:not(.flipped){padding:12px 4px;}
+  #statsTable tbody tr.flipped{background:rgba(131,12,103,.08);border-radius:8px;}
+  #statsTable tbody tr td:nth-child(1)::before{content:'↻';position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:13px;color:var(--text-faint);}
+  #statsTable tbody tr.flipped td:nth-child(1)::before{top:14px;transform:none;}
+  #statsTable tbody tr td:nth-child(2){padding-right:22px !important;}
+  #statsTable tbody tr .chevron{display:none;}
+  #statsTable tbody tr.detail-row{display:none !important;}
+}
+
+/* ---- phone: Bilance and Pa periodiem use the full width ---- */
+@media (max-width:700px){
+  .rec2{flex-direction:row !important;align-items:center;gap:14px !important;padding:4px 0 !important;}
+  .rec-ring{width:118px !important;height:118px !important;flex-shrink:0;}
+  .rec-ring>div{width:90px !important;height:90px !important;}
+  .rec-ring b{font-size:24px !important;} .rec-ring span{font-size:10px !important;}
+  .rec-side{flex:1;min-width:0;max-width:none !important;}
+  .rec-top{gap:8px !important;margin-bottom:12px !important;flex-wrap:wrap;}
+  .rec-gp b{font-size:32px !important;} .rec-gp span{font-size:13px !important;}
+  .pill{padding:5px 12px !important;font-size:14px !important;} .pill b{font-size:19px !important;}
+  .rec-goals .t{font-size:12px !important;} .rec-goals .t b{font-size:22px !important;}
+  .rec-goals .df{font-size:13px !important;padding:2px 8px !important;}
+  /* periods: the period name as a heading, then the bars across the whole width */
+  #teamPeriodTable,#periodTable,#teamPeriodTable tbody,#periodTable tbody{display:block;width:100%;}
+  #teamPeriodTable tr.pr,#periodTable tr.pr{display:block;padding:10px 0;border-bottom:1px solid var(--line);}
+  #teamPeriodTable tr.pr:last-child,#periodTable tr.pr:last-child{border-bottom:none;}
+  #teamPeriodTable tr.pr td,#periodTable tr.pr td{display:block;width:auto !important;border:none !important;padding:0 !important;}
+  #teamPeriodTable td.pn,#periodTable td.pn{font-size:16px !important;margin-bottom:6px;color:var(--text);}
+  .pr-grid{display:grid !important;grid-template-columns:1fr !important;gap:10px !important;}
+  .pd .t{gap:6px;}
+}
+@media (max-width:700px){ .team-stats-row.gamelog-row{display:block !important;} .team-gamelog-col{min-width:0 !important;max-width:100% !important;width:100% !important;overflow-x:auto !important;} #teamGameLogTable{min-width:560px;} }
+@media (max-width:700px){ .league-layout>*,.team-bottom-row>*,.cl-bottom>*{min-width:0 !important;} .league-groups-row,#leagueSwitchBox,.cl-league{width:100% !important;min-width:0 !important;max-width:100% !important;box-sizing:border-box;} #leagueSwitchBox .league-table td:first-child,.cl-league .league-table td:first-child{white-space:normal;} #leagueSwitchBox .league-table td,.cl-league .league-table td{padding:7px 4px !important;} #leagueSwitchBox .league-table th,.cl-league .league-table th{padding:6px 4px !important;font-size:11px !important;} }
+@media (max-width:700px){ #leagueSwitchBox,.cl-league{padding:8px !important;} #leagueSwitchBox .league-table,.cl-league .league-table{width:100% !important;table-layout:auto;} .team-league-col,.cl-table-next{padding:12px !important;} }
+
+/* ---- phone: player pickers in one row ---- */
+@media (max-width:700px){
+  #statsView .filter-row,.club-view .cl-selects{display:flex !important;flex-wrap:nowrap !important;gap:6px !important;align-items:center;}
+  #statsView .filter-row #statsPlayerSelect,.club-view .cl-selects .cl-player{flex:1 1 auto !important;min-width:0;width:auto;font-size:13px;padding:8px 6px;}
+  #statsView .filter-row .season-dd,.club-view .cl-selects .season-dd{flex:0 0 auto;}
+  #statsView .filter-row .season-dd-btn,.club-view .cl-selects .season-dd-btn{min-width:0 !important;width:auto !important;padding:5px 6px !important;gap:4px;font-size:11px;}
+  #statsView .filter-row .season-dd-btn>span:nth-child(2),.club-view .cl-selects .season-dd-btn>span:nth-child(2){max-width:66px;white-space:normal;line-height:1.15;display:block;font-size:10.5px;text-align:left;}
+  #statsView .filter-row .season-dd-btn img,.club-view .cl-selects .season-dd-btn img{width:24px;height:24px;}
+  #statsView .filter-row .season-dd-btn .caret,.club-view .cl-selects .season-dd-btn .caret{display:none;}
+  #statsView .filter-row #statsTeamSelect,.club-view .cl-selects .cl-team{flex:0 0 74px !important;width:74px;font-size:12px;padding:8px 2px;}
+  /* highlight filter as a small ▶ toggle */
+  #statsView .filter-row .highlight-toggle,.club-view .cl-selects .highlight-toggle{flex:0 0 auto;font-size:0 !important;gap:4px;}
+  #statsView .filter-row .highlight-toggle::after,.club-view .cl-selects .highlight-toggle::after{content:'▶';font-size:13px;color:var(--cyan);}
+  .season-dd-menu{max-width:calc(100vw - 24px);}
+}
 </style>
 </head>
 <body>
