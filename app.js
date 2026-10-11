@@ -2534,6 +2534,24 @@ const FLIP_BACK_STYLE = 'stats';   // 'stats' (all numbers) or 'card' (hockey-ca
   }, true);
 })();
 
+// ---------------- phone: rink ----------------
+// On phones the Sastāvs zone keeps its desktop look: it is laid out 740 px wide and shrunk to fit the screen.
+(function(){
+  const BASE = 740;
+  function fit(){
+    const phone = window.matchMedia('(max-width: 700px)').matches;
+    document.querySelectorAll('.rink').forEach(r => {
+      const host = r.parentElement; if (!host) return;
+      if (!phone) { r.style.zoom = ''; return; }
+      const cs = getComputedStyle(host), w = host.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight); if (!w) return;
+      r.style.zoom = Math.min(1, w / BASE).toFixed(3);
+    });
+  }
+  window.addEventListener('resize', fit);
+  new MutationObserver(() => requestAnimationFrame(fit)).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+  fit();
+})();
+
 // ---------------- Latvian ----------------
 // Everything on the page is translated here in one place, as it is shown. Stat names and
 // abbreviations (G, A, PIM, SOG, Shots on goal, ...) and table column headers stay in English.

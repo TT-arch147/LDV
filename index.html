@@ -664,11 +664,7 @@ footer{text-align:center;color:var(--text-faint);font-size:12px;padding:20px;}
 .slot-pop-name{font-family:'Oswald',sans-serif;font-weight:600;font-size:16px;margin-bottom:8px;}
 .slot-pop .card-stat-num{font-size:18px;}
 #skaterBoxTable tr.line-total td{font-weight:700;border-top:2px solid var(--line);background:var(--panel2);}
-@media (max-width:700px){
-  .rink{aspect-ratio:auto;padding:22px 8px 26px;}
-  .rink-row.show{position:static;display:grid;pointer-events:auto;margin:0 auto 10px !important;}
-  .rink-row.show .slot{position:static;transform:none;width:auto;}
-}
+
 
 /* ---- final zone (approved zone mockup) ---- */
 .rink{max-width:1000px;aspect-ratio:1000/520;background:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%201000%20520%22%3E%0A%3Cdefs%3E%3CclipPath%20id%3D%22ice%22%3E%3Cpath%20d%3D%22M0%200%20V320%20A200%20200%200%200%200%20200%20520%20H800%20A200%20200%200%200%200%201000%20320%20V0%20Z%22/%3E%3C/clipPath%3E%3C/defs%3E%0A%3Cpath%20d%3D%22M0%200%20V320%20A200%20200%200%200%200%20200%20520%20H800%20A200%20200%200%200%200%201000%20320%20V0%20Z%22%20fill%3D%22%230E1821%22/%3E%0A%3Cg%20clip-path%3D%22url%28%23ice%29%22%3E%0A%3Crect%20x%3D%220%22%20y%3D%2222%22%20width%3D%221000%22%20height%3D%2214%22%20fill%3D%22%231BA6D8%22%20opacity%3D%22.6%22/%3E%0A%3Cline%20x1%3D%220%22%20y1%3D%22430%22%20x2%3D%221000%22%20y2%3D%22430%22%20stroke%3D%22%23C24A4A%22%20stroke-width%3D%223%22%20opacity%3D%22.8%22/%3E%0A%3Cpath%20d%3D%22M440%20430%20A60%2060%200%200%201%20560%20430%20Z%22%20fill%3D%22%231BA6D8%22%20fill-opacity%3D%22.22%22%20stroke%3D%22%23C24A4A%22%20stroke-width%3D%222.5%22/%3E%0A%3Crect%20x%3D%22470%22%20y%3D%22430%22%20width%3D%2260%22%20height%3D%2234%22%20rx%3D%228%22%20fill%3D%22none%22%20stroke%3D%22%238A99A3%22%20stroke-width%3D%222.5%22%20opacity%3D%22.6%22/%3E%0A%3Cg%20fill%3D%22none%22%20stroke%3D%22%23C24A4A%22%20stroke-width%3D%222.5%22%20opacity%3D%22.7%22%3E%0A%3Ccircle%20cx%3D%22240%22%20cy%3D%22262%22%20r%3D%22112%22/%3E%3Ccircle%20cx%3D%22760%22%20cy%3D%22262%22%20r%3D%22112%22/%3E%0A%3Cpath%20d%3D%22M216%20150%20v-12%20M264%20150%20v-12%20M216%20374%20v12%20M264%20374%20v12%20M736%20150%20v-12%20M784%20150%20v-12%20M736%20374%20v12%20M784%20374%20v12%22/%3E%0A%3Cpath%20d%3D%22M222%20248%20h-24%20v-10%20M258%20248%20h24%20v-10%20M222%20276%20h-24%20v10%20M258%20276%20h24%20v10%20M742%20248%20h-24%20v-10%20M778%20248%20h24%20v-10%20M742%20276%20h-24%20v10%20M778%20276%20h24%20v10%22/%3E%0A%3C/g%3E%0A%3Cg%20fill%3D%22%23C24A4A%22%20opacity%3D%22.85%22%3E%3Ccircle%20cx%3D%22240%22%20cy%3D%22262%22%20r%3D%2210%22/%3E%3Ccircle%20cx%3D%22760%22%20cy%3D%22262%22%20r%3D%2210%22/%3E%3C/g%3E%0A%3C/g%3E%0A%3Cpath%20d%3D%22M3%200%20V320%20A197%20197%200%200%200%20200%20517%20H800%20A197%20197%200%200%200%20997%20320%20V0%22%20fill%3D%22none%22%20stroke%3D%22%233A4757%22%20stroke-width%3D%226%22/%3E%0A%3C/svg%3E") center/100% 100% no-repeat;}
@@ -710,7 +706,7 @@ footer{text-align:center;color:var(--text-faint);font-size:12px;padding:20px;}
 .pc-ring .c{width:86px;height:86px;border-radius:50%;display:grid;place-items:center;flex-shrink:0;}
 .pc-ring .c div{width:66px;height:66px;border-radius:50%;background:var(--panel);display:grid;place-items:center;font-family:'Oswald',sans-serif;font-size:19px;font-weight:600;}
 .pc-ring .k{font-size:13px;color:var(--text-dim);line-height:1.9;} .pc-ring .k b{color:var(--text);}
-@media (max-width:700px){.rink{aspect-ratio:auto;} .rink-row.show .slot{width:auto;} #lineChips button{min-width:0;padding:8px 14px;font-size:13.5px;}}
+
 
 /* ---- team stats: bigger E5 table and next game ---- */
 #leagueUpdatedLabel{display:none;}
@@ -1170,11 +1166,11 @@ footer{text-align:center;color:var(--text-faint);font-size:12px;padding:20px;}
   .filter-row select,.cl-selects select{flex:1 1 45%;min-width:0;}
   /* roster: one card per row */
   .roster-grid,.cl-roster{grid-template-columns:1fr !important;}
-  /* rink: lines stacked, smaller boxes */
-  .rink{aspect-ratio:auto !important;padding:16px 8px 20px !important;background-size:100% 100% !important;}
-  .rink-row.show{position:static !important;display:grid !important;grid-template-columns:1fr !important;gap:8px;margin:0 0 8px !important;}
-  .rink-row.show .slot{position:static !important;transform:none !important;width:auto !important;min-height:0 !important;grid-template-columns:56px 1fr !important;}
-  .rink-row.show .slot .slot-photo{width:56px !important;height:56px !important;}
+  /* rink: the desktop zone, drawn at 740 px and shrunk to the screen (see "phone: rink" in app.js) */
+  .rink{width:740px !important;max-width:none !important;margin:0 !important;}
+  .rink-row.show .slot{min-height:96px !important;padding:10px 12px !important;grid-template-columns:64px minmax(0,1fr) !important;}
+  .rink-row.show .slot .slot-photo{width:64px !important;height:64px !important;}
+  .rink-row.show .slot .slot-name{font-size:17px !important;} .rink-row.show .slot .slot-name .nw{white-space:normal !important;} .rink-row.show .slot .slot-stat{font-size:13px !important;}
   .lineup-head{flex-wrap:wrap;gap:8px;}
   #lineChips button,.cl-lines button{min-width:0;padding:7px 12px;font-size:13px;}
   /* calendar: a list of days that have something on */
