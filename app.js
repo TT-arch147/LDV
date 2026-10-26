@@ -1530,6 +1530,14 @@ renderStatsTab();
     fixed.push({ date: d, type: 'game', div: 'E5', ha: g.isHome ? 'vs' : '@', opp: g.opponent, sub: where,
       short: `${g.isHome ? 'vs' : 'at'} ${g.opponent}`, text: `E5 · ${g.isHome ? 'vs' : 'at'} ${g.opponent}${where ? ' · ' + where : ''}` });
   });
+  // Ledus Veči games already played on EHL but not yet in the game sheet: show them from the EHL calendar
+  ((DATA.club && DATA.club.E5 && DATA.club.E5.games) || []).forEach(g => {
+    if (!g.played || !g.date || DATA.boxscores.some(b => b.date === g.date) || fixed.some(f => f.div === 'E5' && f.date === g.date)) return;
+    const t = DATA.club.E5, home = g.home.abbr === t.abbr, o = home ? g.away : g.home, opp = (t.names || {})[o.abbr] || o.name || o.abbr;
+    const u = home ? g.hg : g.ag, th = home ? g.ag : g.hg;
+    fixed.push({ date: g.date, type: 'game', div: 'E5', ha: home ? 'vs' : '@', opp, res: u > th ? 'W' : u < th ? 'L' : 'D', sub: `${u}-${th}`, ehl: g.protocol || null,
+      short: `${home ? 'vs' : 'at'} ${opp}`, text: `E5 · ${home ? 'vs' : 'at'} ${opp} · ${u}-${th}` });
+  });
   // Ledus Veči II (E7) and III (E9) games from the EHL calendar
   ['E7', 'E9'].forEach(div => {
     const t = DATA.club && DATA.club[div]; if (!t || !t.games) return;
@@ -1592,7 +1600,7 @@ renderStatsTab();
     return `<span class="ce-ini" title="${esc(name)}">${esc(String(name).split(/\s+/).map(w => w[0]).join('').slice(0, 3).toUpperCase())}</span>`;
   }
   function cellItem(e, solo){
-    if (e.type === 'game') return `<span class="ce ce-g d-${e.div}${solo ? ' solo' : ''}${e.res ? ' played' : ''}" title="${esc(e.text)}"${e.res ? ` data-open-game="${e.div}|${e.date}"` : ''}><span class="ce-top"><span class="ha">${e.ha}</span>${oppLogo(e.opp, e.logo)}</span>${e.sub ? `<span class="ce-sub">${esc(e.sub)}${e.res ? ` <span class="home-res ${e.res}">${e.res}</span>${otTag(e.decided)}` : ''}</span>` : ''}</span>`;
+    if (e.type === 'game') return `<span class="ce ce-g d-${e.div}${solo ? ' solo' : ''}${e.res ? ' played' : ''}" title="${esc(e.text)}"${e.ehl ? ` data-ehl="${e.ehl}"` : e.res ? ` data-open-game="${e.div}|${e.date}"` : ''}><span class="ce-top"><span class="ha">${e.ha}</span>${oppLogo(e.opp, e.logo)}</span>${e.sub ? `<span class="ce-sub">${esc(e.sub)}${e.res ? ` <span class="home-res ${e.res}">${e.res}</span>${otTag(e.decided)}` : ''}</span>` : ''}</span>`;
     if (e.type === 'practice') return `<span class="ce ce-p${solo ? ' solo' : ''}" title="${esc(e.text)}"><span class="ce-top">${WHISTLE}</span>${e.sub ? `<span class="ce-sub">${esc(e.sub)}</span>` : ''}</span>`;
     const icon = e.type === 'bday'
       ? '<svg class="ce-pi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16M5 20v-7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v7M5 15c1.5 1 3 1 4.5 0s3-1 4.5 0 3 1 5 0M12 11V8M12 5.5c.8-.9.8-1.7 0-2.5-.8.8-.8 1.6 0 2.5z"/></svg>'
@@ -1635,6 +1643,8 @@ renderStatsTab();
   }
 
   document.getElementById('calGrid').addEventListener('click', e => {
+    const eh = e.target.closest('[data-ehl]');
+    if (eh) { e.stopPropagation(); window.open(eh.dataset.ehl, '_blank', 'noopener'); return; }
     const og = e.target.closest('[data-open-game]');
     if (og) { e.stopPropagation(); const [div, date] = og.dataset.openGame.split('|'); openGameOnSite(div, date); return; }
     const btn = e.target.closest('.cal-day[data-date]'); if (!btn) return;
@@ -1805,6 +1815,11 @@ renderStatsTab();
       const ref = new Date(g.fetchedAt || Date.now()); let y = ref.getFullYear(); if (mi < ref.getMonth() - 2) y++; return isoOf(new Date(y, mi, +m[1])); };
     const up = (DATA.upcomingGames || []).map(g => ({ g, d: gameDate(g) })).filter(x => x.d && x.d >= todayIso).sort((a, b) => a.d < b.d ? -1 : 1)[0];
     const played = games.map(persp);
+    // games already played on EHL but not yet in the game sheet (result from the EHL calendar, link to the EHL protocol)
+    ((CLUB.E5 && CLUB.E5.games) || []).filter(g => g.played && g.date && !games.some(b => b.date === g.date)).forEach(g => {
+      const t = CLUB.E5, home = g.home.abbr === t.abbr, o = home ? g.away : g.home, us = home ? g.hg : g.ag, them = home ? g.ag : g.hg;
+      played.push({ date: g.date, home, opp: (t.names || {})[o.abbr] || o.abbr, us, them, result: us > them ? 'W' : us < them ? 'L' : 'D', link: g.protocol || null, decided: '' }); });
+    played.sort((x, y) => x.date < y.date ? -1 : 1);
     const last = played[played.length - 1];
     const yrs = last ? ((games[games.length - 1].season.match(/\d{4}-\d{4}/) || [''])[0]) : '';
     const season = games.filter(b => b.season.includes(yrs)).map(persp);
