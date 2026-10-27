@@ -989,7 +989,7 @@ function render(){
   resEl.className = 'result-badge ' + (b.result||'');
   document.getElementById('sbOtg').innerHTML = b.otg ? `Player of the game: <b>${playerLink(b.otg)}</b>` : '';
   { const sp = document.getElementById('sbPack'); if (sp) { const n = HL_COUNT(b);
-    sp.innerHTML = n ? `<button type="button" class="pack-btn" id="sbPackBtn">▶ Highlights · ${n} vārti</button>` : '';
+    sp.innerHTML = n ? `<button type="button" class="pack-btn" id="sbPackBtn">▶ Highlights</button>` : '';
     const bt = document.getElementById('sbPackBtn'); if (bt) bt.onclick = () => window.__HL && window.__HL.open(b, 0, false); } }
 
   document.getElementById('goalHomeTitle').innerHTML = `<img src="${teamLogo(b.homeTeam)}" alt=""> <span style="color:${homeColor}">${b.homeTeam.toUpperCase()}</span>`;
@@ -2596,13 +2596,13 @@ const HL = (function(){
   const $ = s => ov.querySelector(s);
   function build(){
     ov = document.createElement('div'); ov.className = 'hlp-ov';
-    ov.innerHTML = `<div class="hlp"><button class="hlp-close" title="Aizvērt">✕</button><div class="hlp-title"><b></b><span></span></div>
+    ov.innerHTML = `<div class="hlp"><button class="hlp-close" title="Aizvērt">✕</button>
       <div class="hlp-player"><div class="hlp-yt" id="hlpYT"></div>
         <div class="hlp-lower"><div class="scb"></div><div class="who"><b></b><small></small></div></div>
         <div class="hlp-card"><div><img alt=""><div class="sc"></div><div class="nm"></div><div class="as"></div></div></div>
         <div class="hlp-fade"></div><div class="hlp-cover on"></div><div class="hlp-big"><span></span></div>
         <div class="hlp-ctrl"><button class="hlp-pp">▶</button><div class="hlp-tl"><div class="fill"></div></div><span class="cnt"></span></div></div>
-      <div class="hlp-foot"><span class="hlp-hint">Atstarpe – pauze · ← → – iepriekšējie / nākamie vārti · Esc – aizvērt</span><span></span></div></div>`;
+      </div>`;
     document.body.appendChild(ov);
     $('.hlp-close').onclick = close; ov.addEventListener('click', e => { if (e.target === ov) close(); });
     $('.hlp-big').onclick = play; $('.hlp-pp').onclick = () => playing ? pause() : play();
@@ -2614,7 +2614,9 @@ const HL = (function(){
   }
   function api(cb){
     if (ytReady) return cb();
-    window.onYouTubeIframeAPIReady = () => { ytp = new YT.Player('hlpYT', { playerVars: { controls: 0, disablekb: 1, modestbranding: 1, rel: 0, playsinline: 1, iv_load_policy: 3 },
+    if (window.YT && YT.Player) { ytp = new YT.Player('hlpYT', { playerVars: { controls: 0, disablekb: 1, modestbranding: 1, rel: 0, playsinline: 1, iv_load_policy: 3 }, events: { onReady: () => { ytReady = true; cb(); } } }); return; }
+    const prevReady = window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady = () => { if (prevReady) prevReady(); ytp = new YT.Player('hlpYT', { playerVars: { controls: 0, disablekb: 1, modestbranding: 1, rel: 0, playsinline: 1, iv_load_policy: 3 },
       events: { onReady: () => { ytReady = true; cb(); } } }); };
     if (!loadingApi) { loadingApi = true; const s = document.createElement('script'); s.src = 'https://www.youtube.com/iframe_api'; document.head.appendChild(s); }
   }
@@ -2645,8 +2647,6 @@ const HL = (function(){
   function open(b, k, onlyOne){
     if (!ov) build(); G = b; list = goalsOf(b); if (!list.length) return;
     single = !!onlyOne; i = single ? k - 1 : -1; playing = false;
-    $('.hlp-title b').textContent = `${b.homeTeam} ${b.htGoals}:${b.atGoals} ${b.awayTeam}`;
-    $('.hlp-title span').textContent = `${b.date} · highlights · ${list.length} vārti`;
     $('.hlp-tl').querySelectorAll('.dot').forEach(d => d.remove());
     list.forEach((g, j) => { const d = document.createElement('span'); d.className = 'dot ' + g.side; d.style.left = ((j + .5) / list.length * 100) + '%'; d.title = g.scorer; d.dataset.k = j; $('.hlp-tl').appendChild(d); });
     $('.hlp-tl .fill').style.width = '0'; $('.hlp-ctrl .cnt').textContent = `0 / ${list.length}`;
@@ -2654,18 +2654,30 @@ const HL = (function(){
     ov.classList.add('on'); api(() => {});
     if (single) play();
   }
-  // a single goal: just the video, in a simple window, starting straight away (no cards or bars)
-  let clipOv;
+  // a single goal: just the video (20 s from 3 s before the goal), no cards or bars, no YouTube buttons;
+  // it starts straight away, and when the clip ends a black cover with "↻" hides YouTube's end screen
+  let clipOv, clipP = null, clipArgs = null, clipApiWait = false;
+  function clipShut(){ if (!clipOv) return; clipOv.classList.remove('on'); try { clipP && clipP.stopVideo(); } catch (e) {} }
+  function clipStart(){ const [id, t] = clipArgs; clipOv.querySelector('.hlp-cover').classList.remove('on'); clipOv.querySelector('.clip-again').style.display = 'none';
+    clipP.loadVideoById({ videoId: id, startSeconds: t, endSeconds: t + CLIP }); }
   function clip(url){
-    const id = vidOf(url), t = Math.max(0, secOf(url) - 3); if (!id) return;
+    const id = vidOf(url), t = Math.max(0, secOf(url) - PRE); if (!id) return;
     if (!clipOv) { clipOv = document.createElement('div'); clipOv.className = 'hlp-ov clip-ov';
-      clipOv.innerHTML = '<div class="hlp clip"><button class="hlp-close" title="Aizvērt">✕</button><div class="hlp-player"></div></div>';
+      clipOv.innerHTML = '<div class="hlp clip"><button class="hlp-close" title="Aizvērt">✕</button><div class="hlp-player"><div class="hlp-yt" id="clipYT"></div><div class="hlp-cover on"></div><button class="clip-again" type="button" title="Atkārtot">↻</button></div></div>';
       document.body.appendChild(clipOv);
-      const shut = () => { clipOv.classList.remove('on'); clipOv.querySelector('.hlp-player').innerHTML = ''; };
-      clipOv.querySelector('.hlp-close').onclick = shut; clipOv.addEventListener('click', e => { if (e.target === clipOv) shut(); });
-      document.addEventListener('keydown', e => { if (e.key === 'Escape' && clipOv.classList.contains('on')) shut(); }); }
-    clipOv.querySelector('.hlp-player').innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${id}?start=${t}&autoplay=1&rel=0&modestbranding=1&playsinline=1" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" allowfullscreen></iframe>`;
-    clipOv.classList.add('on');
+      clipOv.querySelector('.hlp-close').onclick = clipShut; clipOv.addEventListener('click', e => { if (e.target === clipOv) clipShut(); });
+      clipOv.querySelector('.clip-again').onclick = () => clipStart();
+      document.addEventListener('keydown', e => { if (e.key === 'Escape' && clipOv.classList.contains('on')) clipShut(); }); }
+    clipArgs = [id, t]; clipOv.classList.add('on'); clipOv.querySelector('.hlp-cover').classList.add('on');
+    const make = () => { if (clipP) return clipStart();
+      clipP = new YT.Player('clipYT', { playerVars: { controls: 0, disablekb: 1, modestbranding: 1, rel: 0, playsinline: 1, iv_load_policy: 3, fs: 0 },
+        events: { onReady: () => clipStart(),
+          onStateChange: e => { const c = clipOv.querySelector('.hlp-cover');
+            if (e.data === 1) c.classList.remove('on');                                  // playing
+            if (e.data === 0 || e.data === 2) { c.classList.add('on'); clipOv.querySelector('.clip-again').style.display = ''; } } } }); };
+    if (window.YT && YT.Player) make();
+    else { const prev = window.onYouTubeIframeAPIReady; window.onYouTubeIframeAPIReady = () => { if (prev) prev(); make(); };
+      if (!loadingApi && !clipApiWait) { clipApiWait = true; loadingApi = true; const s = document.createElement('script'); s.src = 'https://www.youtube.com/iframe_api'; document.head.appendChild(s); } }
   }
   // E5 ▶ video links open here instead of on YouTube
   document.addEventListener('click', e => {

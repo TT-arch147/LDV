@@ -1449,12 +1449,17 @@ footer{text-align:center;color:var(--text-faint);font-size:12px;padding:20px;}
 @media (max-width:700px){.hlp-ov{padding:8px}.hlp{padding:8px}.hlp-close{top:4px;right:4px}.hlp-card .sc{font-size:40px}.hlp-card img{width:60px;height:60px}.hlp-card .nm{font-size:18px}.hlp-lower{bottom:46px;left:8px}.hlp-lower .scb{font-size:17px;padding:6px 9px}.hlp-lower .who b{font-size:14px}}
 
 /* highlights: crop YouTube's own title bar and bottom buttons out of view, black cover when not playing */
-.hlp:not(.clip) .hlp-player .hlp-yt,.hlp:not(.clip) .hlp-player>iframe{top:-70px !important;height:calc(100% + 140px) !important;}
+.hlp-player .hlp-yt,.hlp-player>iframe{top:-70px !important;height:calc(100% + 140px) !important;}
 .hlp-cover{position:absolute;inset:0;background:#000;z-index:2;opacity:0;transition:opacity .25s;pointer-events:none}
 .hlp-cover.on{opacity:1}
 .hlp.clip{padding:0;background:#000;border:none}
 .hlp.clip .hlp-player{border-radius:12px}
 .hlp.clip .hlp-player iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.clip-again{position:absolute;inset:0;margin:auto;width:76px;height:76px;border-radius:50%;border:none;background:var(--ice);color:#fff;font-size:34px;cursor:pointer;z-index:4;display:none}
+.hlp-player .hlp-cover{pointer-events:none}
+/* Highlights button: black and white */
+.pack-btn{background:#000 !important;color:#fff !important;border:1px solid rgba(255,255,255,.7) !important;box-shadow:none !important;letter-spacing:.3px;}
+.pack-btn:hover{background:#fff !important;color:#000 !important;filter:none !important;}
 </style>
 </head>
 <body>
