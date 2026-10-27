@@ -907,6 +907,7 @@ function labelStatsCells(){
   const heads = [...document.querySelectorAll('#statsTableHead th')].map(th => th.textContent.replace(/[▲▼]/g, '').trim());
   document.querySelectorAll('#statsTable tbody tr').forEach(tr => { if (tr.children.length < 3) return; [...tr.children].forEach((td, i) => { td.dataset.label = heads[i] || ''; }); });
 }
+function HL_COUNT(b){ return [].concat(b.htGoalLog || [], b.atGoalLog || []).filter(g => /youtu/.test(g.video || '')).length; }
 function renderStatsTab(){
   (function(){ const ts = document.getElementById('statsTeamSelect'); if (!ts) return; const n = statsPlayerSelect.value;
     ts.innerHTML = teamSelectHtml(n, null, 'E5'); ts.style.display = ts.options.length > 1 ? '' : 'none';
@@ -987,6 +988,9 @@ function render(){
   resEl.textContent = resultText + (dcd === 'OT' ? ' (OT)' : dcd === 'SO' ? ' (SO)' : '');
   resEl.className = 'result-badge ' + (b.result||'');
   document.getElementById('sbOtg').innerHTML = b.otg ? `Player of the game: <b>${playerLink(b.otg)}</b>` : '';
+  { const sp = document.getElementById('sbPack'); if (sp) { const n = HL_COUNT(b);
+    sp.innerHTML = n ? `<button type="button" class="pack-btn" id="sbPackBtn">▶ Highlight pack · ${n} vārti</button>` : '';
+    const bt = document.getElementById('sbPackBtn'); if (bt) bt.onclick = () => window.__HL && window.__HL.open(b, 0, false); } }
 
   document.getElementById('goalHomeTitle').innerHTML = `<img src="${teamLogo(b.homeTeam)}" alt=""> <span style="color:${homeColor}">${b.homeTeam.toUpperCase()}</span>`;
   document.getElementById('goalAwayTitle').innerHTML = `<img src="${teamLogo(b.awayTeam)}" alt=""> <span style="color:${awayColor}">${b.awayTeam.toUpperCase()}</span>`;
@@ -2567,6 +2571,100 @@ const FLIP_BACK_STYLE = 'stats';   // 'stats' (all numbers) or 'card' (hockey-ca
   new MutationObserver(() => requestAnimationFrame(fit)).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
   fit();
 })();
+
+// ---------------- built-in highlight player (Ledus Veči / E5 games) ----------------
+// Plays the game's one YouTube video, jumping from goal to goal (both teams, in order) behind a short fade, so it
+// watches like one highlight video. Single ▶ video links on E5 pages open the same player at that goal.
+const HL = (function(){
+  const CLIP = 20, PRE = 3;
+  const vidOf = u => (String(u || '').match(/(?:v=|youtu\.be\/|embed\/)([\w-]{11})/) || [])[1] || null;
+  const secOf = u => { const m = String(u || '').match(/[?&]t=(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s?)?/); return m ? (+m[1] || 0) * 3600 + (+m[2] || 0) * 60 + (+m[3] || 0) : 0; };
+  // all goals of one game that have a video time, in the order they happened
+  function goalsOf(b){
+    const out = [], us = b.lvIsHome ? b.htGoalLog : b.atGoalLog, them = b.lvIsHome ? b.atGoalLog : b.htGoalLog;
+    const oppName = b.lvIsHome ? b.awayTeam : b.homeTeam;
+    [['us', us], ['them', them]].forEach(([side, log]) => (log || []).forEach(g => { const id = vidOf(g.video); if (!id) return;
+      out.push({ side, scorer: g.scorer, a: [g.a1, g.a2].filter(Boolean), id, t: secOf(g.video), url: g.video, team: side === 'us' ? 'Ledus Veči' : oppName }); }));
+    return out.sort((x, y) => x.id === y.id ? x.t - y.t : (x.id < y.id ? -1 : 1));
+  }
+  function findGoal(url){
+    const id = vidOf(url), t = secOf(url);
+    for (const b of DATA.boxscores) { const gl = goalsOf(b), k = gl.findIndex(g => g.id === id && Math.abs(g.t - t) <= 2); if (k >= 0) return { b, k }; }
+    return null;
+  }
+  let ov, ytp = null, ytReady = false, G = null, list = [], i = -1, playing = false, segEnd = 0, single = false, loadingApi = false;
+  const $ = s => ov.querySelector(s);
+  function build(){
+    ov = document.createElement('div'); ov.className = 'hlp-ov';
+    ov.innerHTML = `<div class="hlp"><button class="hlp-close" title="Aizvērt">✕</button><div class="hlp-title"><b></b><span></span></div>
+      <div class="hlp-player"><div class="hlp-yt" id="hlpYT"></div>
+        <div class="hlp-lower"><div class="scb"></div><div class="who"><b></b><small></small></div></div>
+        <div class="hlp-card"><div><img alt=""><div class="sc"></div><div class="nm"></div><div class="as"></div></div></div>
+        <div class="hlp-fade"></div><div class="hlp-big"><span></span></div>
+        <div class="hlp-ctrl"><button class="hlp-pp">▶</button><div class="hlp-tl"><div class="fill"></div></div><span class="cnt"></span></div></div>
+      <div class="hlp-foot"><span class="hlp-hint">Atstarpe – pauze · ← → – iepriekšējie / nākamie vārti · Esc – aizvērt</span><button class="pack-btn hlp-all" type="button">▶ Visa spēles highlight pack</button></div></div>`;
+    document.body.appendChild(ov);
+    $('.hlp-close').onclick = close; ov.addEventListener('click', e => { if (e.target === ov) close(); });
+    $('.hlp-big').onclick = play; $('.hlp-pp').onclick = () => playing ? pause() : play();
+    $('.hlp-tl').addEventListener('click', e => { const d = e.target.closest('.dot'); if (d) { single = false; $('.hlp-all').style.display = 'none'; $('.hlp-big').classList.add('hide'); playing = true; go(+d.dataset.k); } });
+    $('.hlp-all').onclick = () => { single = false; $('.hlp-all').style.display = 'none'; $('.hlp-big').classList.add('hide'); playing = true; go(0); };
+    document.addEventListener('keydown', e => { if (!ov.classList.contains('on')) return;
+      if (e.key === 'Escape') close(); if (e.key === ' ') { e.preventDefault(); playing ? pause() : play(); }
+      if (e.key === 'ArrowRight' && i >= 0 && i < list.length - 1) go(i + 1); if (e.key === 'ArrowLeft' && i > 0) go(i - 1); });
+    setInterval(() => { if (ytReady && playing && i >= 0 && ytp.getCurrentTime && ytp.getCurrentTime() >= segEnd) single ? finish() : go(i + 1); }, 250);
+  }
+  function api(cb){
+    if (ytReady) return cb();
+    window.onYouTubeIframeAPIReady = () => { ytp = new YT.Player('hlpYT', { playerVars: { controls: 0, disablekb: 1, modestbranding: 1, rel: 0, playsinline: 1, iv_load_policy: 3 },
+      events: { onReady: () => { ytReady = true; cb(); } } }); };
+    if (!loadingApi) { loadingApi = true; const s = document.createElement('script'); s.src = 'https://www.youtube.com/iframe_api'; document.head.appendChild(s); }
+  }
+  const logoFor = g => g.side === 'us' ? teamLogo('Ledus Veči') : teamLogo(g.team);
+  function scoreAt(k){ let u = 0, t = 0; for (let j = 0; j <= k; j++) list[j].side === 'us' ? u++ : t++; return G.lvIsHome ? `${u}:${t}` : `${t}:${u}`; }
+  function go(k){
+    if (k >= list.length) { finish(); return; } i = k; const g = list[k];
+    $('.hlp-fade').classList.add('on'); $('.hlp-lower').classList.remove('on');
+    $('.hlp-card img').src = logoFor(g); $('.hlp-card img').style.display = '';
+    $('.hlp-card .sc').textContent = scoreAt(k); $('.hlp-card .nm').textContent = g.scorer;
+    $('.hlp-card .as').textContent = g.a.length ? 'Piespēles: ' + g.a.join(', ') : ''; $('.hlp-card').classList.add('on');
+    segEnd = g.t - PRE + CLIP;
+    if (ytReady) { if (ytp.getVideoData && ytp.getVideoData().video_id === g.id) ytp.seekTo(Math.max(0, g.t - PRE), true); else ytp.loadVideoById({ videoId: g.id, startSeconds: Math.max(0, g.t - PRE) }); ytp.playVideo(); }
+    setTimeout(() => { $('.hlp-card').classList.remove('on'); $('.hlp-fade').classList.remove('on');
+      $('.hlp-lower .scb').innerHTML = `<img src="${logoFor(g)}" alt="">${scoreAt(k)}`; $('.hlp-lower .who b').textContent = g.scorer;
+      $('.hlp-lower .who small').textContent = g.a.join(', '); $('.hlp-lower').className = 'hlp-lower on ' + g.side; }, 1100);
+    $('.hlp-tl .fill').style.width = ((k + 1) / list.length * 100) + '%'; $('.hlp-ctrl .cnt').textContent = `${k + 1} / ${list.length}`;
+  }
+  function finish(){ playing = false; if (ytReady) ytp.pauseVideo(); $('.hlp-lower').classList.remove('on');
+    const us = G.lvIsHome ? G.htGoals : G.atGoals, th = G.lvIsHome ? G.atGoals : G.htGoals;
+    $('.hlp-card img').style.display = 'none'; $('.hlp-card .sc').textContent = `${G.htGoals}:${G.atGoals}`;
+    $('.hlp-card .nm').textContent = single ? 'Vārtu klips beidzās' : 'Spēles beigas'; $('.hlp-card .as').textContent = `${G.homeTeam} – ${G.awayTeam}`;
+    $('.hlp-card').classList.add('on'); $('.hlp-fade').classList.add('on'); $('.hlp-big').classList.remove('hide'); $('.hlp-pp').textContent = '▶';
+    if (single) $('.hlp-all').style.display = ''; i = single ? i - 1 : -1; }
+  function play(){ $('.hlp-big').classList.add('hide'); playing = true; $('.hlp-pp').textContent = '❚❚'; api(() => { if (i < 0 || !ytp.getPlayerState || ytp.getPlayerState() === 0 || $('.hlp-fade').classList.contains('on')) go(Math.max(0, i < 0 ? 0 : i + (single ? 1 : 0))); else ytp.playVideo(); }); }
+  function pause(){ playing = false; $('.hlp-pp').textContent = '▶'; if (ytReady) ytp.pauseVideo(); }
+  function close(){ pause(); ov.classList.remove('on'); }
+  function open(b, k, onlyOne){
+    if (!ov) build(); G = b; list = goalsOf(b); if (!list.length) return;
+    single = !!onlyOne; i = single ? k - 1 : -1; playing = false;
+    $('.hlp-title b').textContent = `${b.homeTeam} ${b.htGoals}:${b.atGoals} ${b.awayTeam}`;
+    $('.hlp-title span').textContent = `${b.date} · ${single ? 'vārtu video' : 'highlight pack · ' + list.length + ' vārti'}`;
+    $('.hlp-tl').querySelectorAll('.dot').forEach(d => d.remove());
+    list.forEach((g, j) => { const d = document.createElement('span'); d.className = 'dot ' + g.side; d.style.left = ((j + .5) / list.length * 100) + '%'; d.title = g.scorer; d.dataset.k = j; $('.hlp-tl').appendChild(d); });
+    $('.hlp-tl .fill').style.width = '0'; $('.hlp-ctrl .cnt').textContent = `0 / ${list.length}`; $('.hlp-all').style.display = single ? '' : 'none';
+    $('.hlp-card').classList.remove('on'); $('.hlp-lower').classList.remove('on'); $('.hlp-fade').classList.remove('on'); $('.hlp-big').classList.remove('hide'); $('.hlp-pp').textContent = '▶';
+    ov.classList.add('on'); api(() => {});
+    if (single) play();
+  }
+  // E5 ▶ video links open here instead of on YouTube
+  document.addEventListener('click', e => {
+    const a = e.target.closest('a[href*="youtube.com/watch"], a[href*="youtu.be/"]'); if (!a) return;
+    if (a.closest('.club-view')) return;   // Ledus Veči II / III keep their own links
+    const f = findGoal(a.getAttribute('href')); if (!f) return;
+    e.preventDefault(); open(f.b, f.k, true);
+  }, true);
+  return { open, goalsOf };
+})();
+window.__HL = HL;
 
 // ---------------- Latvian ----------------
 // Everything on the page is translated here in one place, as it is shown. Stat names and
