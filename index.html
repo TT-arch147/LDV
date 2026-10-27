@@ -1366,6 +1366,32 @@ footer{text-align:center;color:var(--text-faint);font-size:12px;padding:20px;}
   .club-view .cl-gl tbody tr td:nth-child(1){font-weight:700;}
 }
 @media (max-width:700px){ .club-view .cl-gl tbody tr td:nth-child(1),.club-view .cl-gl tbody tr td:nth-child(2){display:block !important;align-self:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;} .club-view .cl-gl tbody tr td:nth-child(2){text-align:right;white-space:normal !important;overflow:visible !important;} .club-view .cl-gl tbody tr td:nth-child(2) img{vertical-align:-4px;} }
+
+/* ---- table and next games as separate boxes ---- */
+.team-bottom-row{display:grid !important;grid-template-columns:290px minmax(0,1fr) minmax(250px,320px);gap:16px;align-items:stretch;}
+.team-bottom-row>.panel{margin:0;min-width:0;}
+.team-bottom-row .team-totals-col{width:auto !important;}
+.team-league-col .league-layout{display:block !important;}
+.next-games-col .calendar-section{border:none !important;padding:0 !important;margin:0 !important;}
+.next-games-col .calendar-section>.league-group-title{font-size:22px;color:var(--text);text-transform:none;letter-spacing:.2px;margin-bottom:12px;}
+.next-games-col .calendar-row{display:flex;flex-direction:column;align-items:flex-start;gap:8px;padding:12px 0;border-bottom:1px solid var(--line);}
+.next-games-col .calendar-row:last-child{border-bottom:none;}
+.next-games-col .calendar-opp{font-size:19px;font-weight:700;display:flex;align-items:center;gap:8px;}
+.next-games-col .calendar-row:first-child .calendar-opp{font-size:24px;}
+.next-games-col .calendar-opp .vs{font-size:15px;color:var(--text-dim);font-weight:500;}
+.next-games-col .calendar-opp .league-logo{width:32px;height:32px;margin:0;}
+.next-games-col .calendar-when{font-size:14px;color:var(--text-dim);text-align:left;}
+@media (max-width:1500px){.team-bottom-row{grid-template-columns:290px minmax(0,1fr);} .team-bottom-row .next-games-col{grid-column:1 / -1;}
+  .next-games-col #calendarBody,.next-games-col [id^="clNext-"]{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:0 18px;}}
+@media (max-width:900px){.team-bottom-row{grid-template-columns:1fr !important;}}
+/* Ledus Veči II / III: the same split */
+.cl-bottom{grid-template-columns:290px minmax(0,1fr) minmax(250px,320px) !important;}
+.cl-table-next .league-layout{display:block !important;}
+@media (max-width:1500px){.cl-bottom{grid-template-columns:290px minmax(0,1fr) !important;} .cl-bottom>.cl-next-panel{grid-column:1 / -1;}}
+@media (max-width:900px){.cl-bottom{grid-template-columns:1fr !important;}}
+.next-games-col .league-group-title a{float:none !important;display:inline-block;margin-left:12px;font-size:13px;vertical-align:3px;}
+.team-gamelog-col{min-width:0 !important;overflow-x:auto;}
+.gamelog-row{min-width:0;}
 </style>
 </head>
 <body>
@@ -1600,10 +1626,12 @@ footer{text-align:center;color:var(--text-faint);font-size:12px;padding:20px;}
             </table>
           </div>
         </div>
+        </div>
+      </div>
+      <div class="panel next-games-col">
         <div class="calendar-section">
           <div class="league-group-title">Next games <a href="#" id="openCalendarLink" style="float:right;text-transform:none;letter-spacing:0;font-family:Inter,sans-serif;font-weight:500;">Full calendar</a></div>
           <div id="calendarBody"></div>
-        </div>
         </div>
       </div>
     </div>

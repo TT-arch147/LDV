@@ -2398,8 +2398,8 @@ document.getElementById('statsTeamSelect') && document.getElementById('statsTeam
       <div class="cl-bottom"><div class="panel"><h2>Sezonas kopsummas un vidējie</h2><table id="clTot-${div}" class="cl-totals"><tr><th></th><th>Kopā</th><th>Vidēji spēlē</th></tr>
         ${totals.map(([title, rows]) => `<tr class="tt-group"><td colspan="3">${title}</td></tr>` + rows.map(([l, v, av]) => av === null ? `<tr><td>${l}</td><td colspan="2" style="text-align:center"><b>${v}</b></td></tr>` : `<tr><td>${l}</td><td><b>${v}</b></td><td style="color:var(--text-dim)">${av}</td></tr>`).join('')).join('')}</table></div>
         <div class="panel team-league-col cl-table-next"><h2>${div} turnīra tabula</h2><div class="league-layout"><div class="league-groups-row">${bigTable}</div>
-          <div class="calendar-section"><div class="league-group-title">Nākamās spēles</div><div id="clNext-${div}">${upcoming.slice(0, 6).map(g => `<div class="calendar-row"><div class="calendar-opp"><span class="vs">${g.home ? 'vs' : '@'}</span>${g.logo ? `<img class="league-logo" src="${g.logo}" alt="">` : ''}${esc(g.opp)}</div>
-            <div class="calendar-when">${dLong(g.date).replace(/ \d{4}$/, '')}${g.time ? ' · ' + g.time : ''}${g.arena ? ' · ' + esc(g.arena) : ''}</div></div>`).join('') || '<div class="empty-note">Vēl nekas nav ieplānots</div>'}</div></div></div></div></div>`;
+          </div></div><div class="panel cl-next-panel next-games-col"><div class="calendar-section"><div class="league-group-title">Nākamās spēles</div><div id="clNext-${div}">${upcoming.slice(0, 6).map(g => `<div class="calendar-row"><div class="calendar-opp"><span class="vs">${g.home ? 'vs' : '@'}</span>${g.logo ? `<img class="league-logo" src="${g.logo}" alt="">` : ''}${esc(g.opp)}</div>
+            <div class="calendar-when">${dLong(g.date).replace(/ \d{4}$/, '')}${g.time ? ' · ' + g.time : ''}${g.arena ? ' · ' + esc(g.arena) : ''}</div></div>`).join('') || '<div class="empty-note">Vēl nekas nav ieplānots</div>'}</div></div></div></div>`;
 
     // ---- Sastāvs ----
     const groups = players.some(p => p.pos) ? POS : [[null, 'Spēlētāji']];
