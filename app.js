@@ -1435,7 +1435,8 @@ function renderLeagueGroup(elId, teams) {
     const classes = [isLDV ? 'ldv-row' : '', i === 2 ? 'playoff-cutoff' : ''].filter(Boolean).join(' ');
     const logoObj = DATA.teamAssets && DATA.teamAssets[map.logoKey || display];
     const logo = logoObj && logoObj.logo;
-    const nameCell = logo ? `<img class="league-logo" src="${logo}" alt="">${display}` : display;
+    const brk = String(display).replace(/\//g, '/<wbr>');   // long names like Iecava/Mammoths may break after the slash
+    const nameCell = logo ? `<img class="league-logo" src="${logo}" alt="">${brk}` : brk;
     const st = (DATA.leagueStats && DATA.leagueStats.teams || {})[String(t.team).toUpperCase()] || {};
     const pc = v => v == null ? '—' : Math.round(v) + '%';
     return `<tr class="${classes}"><td>${nameCell}</td><td>${t.gp}</td><td>${st.gf ?? '—'}</td><td>${st.ga ?? '—'}</td><td>${pc(st.pp)}</td><td>${pc(st.pk)}</td><td class="pts">${t.points}</td></tr>`;
@@ -2294,7 +2295,7 @@ document.getElementById('statsTeamSelect') && document.getElementById('statsTeam
       const cut = grouped ? (n === 2 ? 'playoff-cutoff' : '') : (n === 4 ? 'playoff-cutoff' : n === 12 ? 'cut-pi' : '');
       const lg = me ? teamLogo('Ledus Veči') : logoFor(x.team) || logoFor(nice(x.team));
       const p = v => v == null ? '—' : Math.round(v) + '%';
-      return `<tr class="${[me ? 'ldv-row' : '', cut, wc ? 'wc' : ''].join(' ')}"><td>${lg ? `<img class="league-logo" src="${lg}" alt="">` : ''}${esc(nice(x.team))}${wc ? ' <span class="wc-badge">WC</span>' : ''}</td>
+      return `<tr class="${[me ? 'ldv-row' : '', cut, wc ? 'wc' : ''].join(' ')}"><td>${lg ? `<img class="league-logo" src="${lg}" alt="">` : ''}${esc(nice(x.team)).replace(/\//g, '/<wbr>')}${wc ? ' <span class="wc-badge">WC</span>' : ''}</td>
         <td>${x.gp ?? ''}</td><td>${st.gf ?? '—'}</td><td>${st.ga ?? '—'}</td><td>${p(st.pp)}</td><td>${p(st.pk)}</td><td class="pts">${x.points ?? ''}</td></tr>`; }).join('');
     const bigTbl = (teams, offset, k, on) => `<table class="league-table" data-k="${k}"${on ? '' : ' style="display:none"'}><thead><tr><th style="text-align:left">Team</th><th>GP</th><th>GF</th><th>GA</th><th>PP%</th><th>PK%</th><th>PTS</th></tr></thead><tbody>${bigRows(teams, offset)}</tbody></table>`;
     let bigTable = '<div class="empty-note">Tabula vēl nav ielādēta</div>';

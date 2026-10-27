@@ -1392,6 +1392,22 @@ footer{text-align:center;color:var(--text-faint);font-size:12px;padding:20px;}
 .next-games-col .league-group-title a{float:none !important;display:inline-block;margin-left:12px;font-size:13px;vertical-align:3px;}
 .team-gamelog-col{min-width:0 !important;overflow-x:auto;}
 .gamelog-row{min-width:0;}
+
+/* tables: natural height (iOS Safari miscalculates "height:100%" tables inside grids, so rows spilled out of the box) */
+.team-bottom-row .league-groups-row,.team-bottom-row #leagueSwitchBox{height:auto !important;}
+#leagueSwitchBox table[data-g],.cl-league table[data-k],.cl-league table[data-g]{height:auto !important;flex:none !important;}
+#leagueSwitchBox,.cl-league{display:block !important;}
+#leagueSwitchBox.show-Z table[data-g="Z"],#leagueSwitchBox.show-D table[data-g="D"]{display:table !important;}
+@media (max-width:700px){
+  #leagueSwitchBox .league-table td:first-child,.cl-league .league-table td:first-child{white-space:normal !important;line-height:1.2;width:42%;overflow-wrap:normal;font-size:13.5px;}
+  #leagueSwitchBox .league-logo,.cl-league .league-logo{width:24px !important;height:24px !important;margin:0 6px 0 0 !important;float:left;}
+  #leagueSwitchBox .league-table td,.cl-league .league-table td,#leagueSwitchBox .league-table th,.cl-league .league-table th{padding:8px 2px !important;}
+  #leagueSwitchBox .league-table,.cl-league .league-table{width:100% !important;table-layout:fixed;}
+  #leagueSwitchBox .league-table th:first-child,.cl-league .league-table th:first-child{width:38%;}
+  #leagueSwitchBox .league-table th:nth-child(5),#leagueSwitchBox .league-table th:nth-child(6),.cl-league .league-table th:nth-child(5),.cl-league .league-table th:nth-child(6){width:13%;}
+  #leagueSwitchBox .league-table td:not(:first-child),.cl-league .league-table td:not(:first-child){font-size:13.5px;}
+  #leagueSwitchBox .league-table,.cl-league .league-table{font-size:14px !important;}
+}
 </style>
 </head>
 <body>
