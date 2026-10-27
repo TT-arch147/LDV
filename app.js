@@ -989,7 +989,7 @@ function render(){
   resEl.className = 'result-badge ' + (b.result||'');
   document.getElementById('sbOtg').innerHTML = b.otg ? `Player of the game: <b>${playerLink(b.otg)}</b>` : '';
   { const sp = document.getElementById('sbPack'); if (sp) { const n = HL_COUNT(b);
-    sp.innerHTML = n ? `<button type="button" class="pack-btn" id="sbPackBtn">▶ Highlight pack · ${n} vārti</button>` : '';
+    sp.innerHTML = n ? `<button type="button" class="pack-btn" id="sbPackBtn">▶ Highlights · ${n} vārti</button>` : '';
     const bt = document.getElementById('sbPackBtn'); if (bt) bt.onclick = () => window.__HL && window.__HL.open(b, 0, false); } }
 
   document.getElementById('goalHomeTitle').innerHTML = `<img src="${teamLogo(b.homeTeam)}" alt=""> <span style="color:${homeColor}">${b.homeTeam.toUpperCase()}</span>`;
@@ -2600,14 +2600,13 @@ const HL = (function(){
       <div class="hlp-player"><div class="hlp-yt" id="hlpYT"></div>
         <div class="hlp-lower"><div class="scb"></div><div class="who"><b></b><small></small></div></div>
         <div class="hlp-card"><div><img alt=""><div class="sc"></div><div class="nm"></div><div class="as"></div></div></div>
-        <div class="hlp-fade"></div><div class="hlp-big"><span></span></div>
+        <div class="hlp-fade"></div><div class="hlp-cover on"></div><div class="hlp-big"><span></span></div>
         <div class="hlp-ctrl"><button class="hlp-pp">▶</button><div class="hlp-tl"><div class="fill"></div></div><span class="cnt"></span></div></div>
-      <div class="hlp-foot"><span class="hlp-hint">Atstarpe – pauze · ← → – iepriekšējie / nākamie vārti · Esc – aizvērt</span><button class="pack-btn hlp-all" type="button">▶ Visa spēles highlight pack</button></div></div>`;
+      <div class="hlp-foot"><span class="hlp-hint">Atstarpe – pauze · ← → – iepriekšējie / nākamie vārti · Esc – aizvērt</span><span></span></div></div>`;
     document.body.appendChild(ov);
     $('.hlp-close').onclick = close; ov.addEventListener('click', e => { if (e.target === ov) close(); });
     $('.hlp-big').onclick = play; $('.hlp-pp').onclick = () => playing ? pause() : play();
-    $('.hlp-tl').addEventListener('click', e => { const d = e.target.closest('.dot'); if (d) { single = false; $('.hlp-all').style.display = 'none'; $('.hlp-big').classList.add('hide'); playing = true; go(+d.dataset.k); } });
-    $('.hlp-all').onclick = () => { single = false; $('.hlp-all').style.display = 'none'; $('.hlp-big').classList.add('hide'); playing = true; go(0); };
+    $('.hlp-tl').addEventListener('click', e => { const d = e.target.closest('.dot'); if (d) { single = false; $('.hlp-big').classList.add('hide'); $('.hlp-cover').classList.remove('on'); playing = true; go(+d.dataset.k); } });
     document.addEventListener('keydown', e => { if (!ov.classList.contains('on')) return;
       if (e.key === 'Escape') close(); if (e.key === ' ') { e.preventDefault(); playing ? pause() : play(); }
       if (e.key === 'ArrowRight' && i >= 0 && i < list.length - 1) go(i + 1); if (e.key === 'ArrowLeft' && i > 0) go(i - 1); });
@@ -2638,29 +2637,42 @@ const HL = (function(){
     const us = G.lvIsHome ? G.htGoals : G.atGoals, th = G.lvIsHome ? G.atGoals : G.htGoals;
     $('.hlp-card img').style.display = 'none'; $('.hlp-card .sc').textContent = `${G.htGoals}:${G.atGoals}`;
     $('.hlp-card .nm').textContent = single ? 'Vārtu klips beidzās' : 'Spēles beigas'; $('.hlp-card .as').textContent = `${G.homeTeam} – ${G.awayTeam}`;
-    $('.hlp-card').classList.add('on'); $('.hlp-fade').classList.add('on'); $('.hlp-big').classList.remove('hide'); $('.hlp-pp').textContent = '▶';
-    if (single) $('.hlp-all').style.display = ''; i = single ? i - 1 : -1; }
-  function play(){ $('.hlp-big').classList.add('hide'); playing = true; $('.hlp-pp').textContent = '❚❚'; api(() => { if (i < 0 || !ytp.getPlayerState || ytp.getPlayerState() === 0 || $('.hlp-fade').classList.contains('on')) go(Math.max(0, i < 0 ? 0 : i + (single ? 1 : 0))); else ytp.playVideo(); }); }
-  function pause(){ playing = false; $('.hlp-pp').textContent = '▶'; if (ytReady) ytp.pauseVideo(); }
+    $('.hlp-card').classList.add('on'); $('.hlp-fade').classList.add('on'); $('.hlp-cover').classList.add('on'); $('.hlp-big').classList.remove('hide'); $('.hlp-pp').textContent = '▶';
+    i = -1; }
+  function play(){ $('.hlp-big').classList.add('hide'); $('.hlp-cover').classList.remove('on'); playing = true; $('.hlp-pp').textContent = '❚❚'; api(() => { if (i < 0 || !ytp.getPlayerState || ytp.getPlayerState() === 0 || $('.hlp-fade').classList.contains('on')) go(Math.max(0, i < 0 ? 0 : i + (single ? 1 : 0))); else ytp.playVideo(); }); }
+  function pause(){ playing = false; $('.hlp-pp').textContent = '▶'; if (ytReady) ytp.pauseVideo(); $('.hlp-cover').classList.add('on'); $('.hlp-big').classList.remove('hide'); }
   function close(){ pause(); ov.classList.remove('on'); }
   function open(b, k, onlyOne){
     if (!ov) build(); G = b; list = goalsOf(b); if (!list.length) return;
     single = !!onlyOne; i = single ? k - 1 : -1; playing = false;
     $('.hlp-title b').textContent = `${b.homeTeam} ${b.htGoals}:${b.atGoals} ${b.awayTeam}`;
-    $('.hlp-title span').textContent = `${b.date} · ${single ? 'vārtu video' : 'highlight pack · ' + list.length + ' vārti'}`;
+    $('.hlp-title span').textContent = `${b.date} · highlights · ${list.length} vārti`;
     $('.hlp-tl').querySelectorAll('.dot').forEach(d => d.remove());
     list.forEach((g, j) => { const d = document.createElement('span'); d.className = 'dot ' + g.side; d.style.left = ((j + .5) / list.length * 100) + '%'; d.title = g.scorer; d.dataset.k = j; $('.hlp-tl').appendChild(d); });
-    $('.hlp-tl .fill').style.width = '0'; $('.hlp-ctrl .cnt').textContent = `0 / ${list.length}`; $('.hlp-all').style.display = single ? '' : 'none';
-    $('.hlp-card').classList.remove('on'); $('.hlp-lower').classList.remove('on'); $('.hlp-fade').classList.remove('on'); $('.hlp-big').classList.remove('hide'); $('.hlp-pp').textContent = '▶';
+    $('.hlp-tl .fill').style.width = '0'; $('.hlp-ctrl .cnt').textContent = `0 / ${list.length}`;
+    $('.hlp-card').classList.remove('on'); $('.hlp-lower').classList.remove('on'); $('.hlp-fade').classList.remove('on'); $('.hlp-cover').classList.add('on'); $('.hlp-big').classList.remove('hide'); $('.hlp-pp').textContent = '▶';
     ov.classList.add('on'); api(() => {});
     if (single) play();
+  }
+  // a single goal: just the video, in a simple window, starting straight away (no cards or bars)
+  let clipOv;
+  function clip(url){
+    const id = vidOf(url), t = Math.max(0, secOf(url) - 3); if (!id) return;
+    if (!clipOv) { clipOv = document.createElement('div'); clipOv.className = 'hlp-ov clip-ov';
+      clipOv.innerHTML = '<div class="hlp clip"><button class="hlp-close" title="Aizvērt">✕</button><div class="hlp-player"></div></div>';
+      document.body.appendChild(clipOv);
+      const shut = () => { clipOv.classList.remove('on'); clipOv.querySelector('.hlp-player').innerHTML = ''; };
+      clipOv.querySelector('.hlp-close').onclick = shut; clipOv.addEventListener('click', e => { if (e.target === clipOv) shut(); });
+      document.addEventListener('keydown', e => { if (e.key === 'Escape' && clipOv.classList.contains('on')) shut(); }); }
+    clipOv.querySelector('.hlp-player').innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${id}?start=${t}&autoplay=1&rel=0&modestbranding=1&playsinline=1" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" allowfullscreen></iframe>`;
+    clipOv.classList.add('on');
   }
   // E5 ▶ video links open here instead of on YouTube
   document.addEventListener('click', e => {
     const a = e.target.closest('a[href*="youtube.com/watch"], a[href*="youtu.be/"]'); if (!a) return;
     if (a.closest('.club-view')) return;   // Ledus Veči II / III keep their own links
-    const f = findGoal(a.getAttribute('href')); if (!f) return;
-    e.preventDefault(); open(f.b, f.k, true);
+    if (!findGoal(a.getAttribute('href'))) return;
+    e.preventDefault(); clip(a.getAttribute('href'));
   }, true);
   return { open, goalsOf };
 })();
