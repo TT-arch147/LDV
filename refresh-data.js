@@ -572,6 +572,17 @@ async function fetchTeamView(seasonTeamId, divisionId) {
     throw new Error('response did not look like the team-filtered view');
   }
   const games = parseTeamView(html);
+  // check: every game row on the page should have become a game; log any that didn't, so they can be fixed
+  const rows = [...html.matchAll(/<tr class="div_[^"]*">([\s\S]*?)<\/tr>/g)].map(m => m[1]);
+  if (rows.length !== games.length) {
+    const txt = s => s.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+    console.log(`team view ${seasonTeamId}: ${rows.length} game rows on the page, ${games.length} read. Rows:`);
+    rows.forEach((row, i) => console.log(`  row ${i + 1}: ${txt(row).slice(0, 140)}${/protokols\/(\d+)/.test(row) ? ' · protokols ' + row.match(/protokols\/(\d+)/)[1] : ''}`));
+    const days = [...html.matchAll(/<div class="day">([\s\S]*?)<\/div>/g)].map(m => txt(m[1]));
+    console.log(`  days on the page: ${days.join(' | ')}`);
+  }
+  { const today = new Date().toISOString().slice(0, 10), odd = games.filter(g => g.date && g.date < today && !g.played);
+    if (odd.length) console.log(`team view ${seasonTeamId}: ${odd.length} past game(s) without a result: ` + odd.map(g => `${g.date} ${g.home.abbr}-${g.away.abbr}${g.protocol ? ' (' + g.protocol.split('/').pop() + ')' : ''}`).join(', ')); }
   if (!games.length) {
     const i = html.indexOf('<tr class="div_');
     console.log(`team view ${teamId}: no game rows parsed; sample:`, i >= 0 ? html.slice(i, i + 500).replace(/\s+/g, ' ') : '(no div_ rows at all)');
