@@ -2577,9 +2577,14 @@ const FLIP_BACK_STYLE = 'stats';   // 'stats' (all numbers) or 'card' (hockey-ca
 // watches like one highlight video. Single ▶ video links on E5 pages open a short clip of that goal.
 // Speed tricks: the YouTube player code is loaded in the background before anyone clicks; the first goal is
 // buffered silently while the big ▶ is still showing; and a second hidden player buffers the NEXT goal while
-// the current one plays, so each jump is instant (no black screen, feels like a local video).
+// the current one plays, so each jump is instant (no black screen, feels like a local video). The hidden player
+// warms up a few seconds before each clip, so the clip starts in full quality instead of blurry.
 const HL = (function(){
   const CLIP = 20, PRE = 3, CARD_MIN = 1100, REVEAL_MAX = 8000;
+  // WARM: the hidden player starts this many seconds BEFORE the clip and plays (muted, out of sight) up to the clip
+  // start. YouTube always starts a video in low quality and steps up after a few seconds - this way the step-up
+  // happens during the warm-up, and the clip itself is already buffered in full quality when it's shown.
+  const WARM = 8, MAX_CATCHUP = 3;
   const vidOf = u => (String(u || '').match(/(?:v=|youtu\.be\/|embed\/)([\w-]{11})/) || [])[1] || null;
   const secOf = u => { const m = String(u || '').match(/[?&]t=(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s?)?/); return m ? (+m[1] || 0) * 3600 + (+m[2] || 0) * 60 + (+m[3] || 0) : 0; };
   const PV = { controls: 0, disablekb: 1, modestbranding: 1, rel: 0, playsinline: 1, iv_load_policy: 3, vq: 'hd1080' };
@@ -2644,47 +2649,58 @@ const HL = (function(){
     document.addEventListener('keydown', e => { if (!ov.classList.contains('on')) return;
       if (e.key === 'Escape') close(); if (e.key === ' ') { e.preventDefault(); playing ? pause() : play(); }
       if (e.key === 'ArrowRight' && i >= 0 && i < list.length - 1) go(i + 1); if (e.key === 'ArrowLeft' && i > 0) go(i - 1); });
-    setInterval(() => { const p = pl(cur); if (ready !== 2 || i < 0 || !p || !p.getCurrentTime) return;
+    setInterval(() => {
+      // warm-ups: stop each hidden player exactly at its clip start (everything from there on is buffered in HD)
+      P.forEach((s, j) => { if (!s.prepping || !s.rolling || (j === cur && playing)) return;
+        const t = s.p.getCurrentTime ? s.p.getCurrentTime() : 0;
+        if (t >= s.want.t - 0.15) { s.p.pauseVideo(); s.prepping = false; s.rolling = false; s.ok = true; } });
+      const p = pl(cur); if (ready !== 2 || i < 0 || !p || !p.getCurrentTime) return;
       const t = p.getCurrentTime(), since = Date.now() - goAt;
       // video is really running inside this goal's clip -> take the card down (covers seeks that fire no event)
       if (reveal && playing && since > 400 && p.getPlayerState() === 1 && t >= segEnd - CLIP - 0.5 && t < segEnd) reveal();
       // clip finished -> next goal (ignore the first moments after a jump, while the old time may still show)
       if (playing && since > 1500 && t >= segEnd) single ? finish() : go(i + 1); }, 250);
   }
-  function show(n){ P.forEach((x, j) => { const f = x.p.getIframe && x.p.getIframe(); if (f) { f.style.visibility = j === n ? 'visible' : 'hidden'; f.style.zIndex = j === n ? '1' : '0'; } }); }
+  // both players stay "visible" and full size (the waiting one just sits underneath), because YouTube lowers the
+  // quality of players it thinks are hidden or small
+  function show(n){ P.forEach((x, j) => { const f = x.p.getIframe && x.p.getIframe(); if (f) { f.style.visibility = 'visible'; f.style.zIndex = j === n ? '1' : '0'; } }); }
   function makePlayers(cb){
     if (ready === 2) return cb(); if (ready === 1) { P.cb = cb; return; } ready = 1; P.cb = cb;
     ensureApi(() => { let n = 0;
-      ['hlpYT', 'hlpYT2'].forEach((el, j) => { const slot = { p: null, want: null, ok: false, prepping: false };
+      ['hlpYT', 'hlpYT2'].forEach((el, j) => { const slot = { p: null, want: null, ok: false, prepping: false, rolling: false };
         slot.p = new YT.Player(el, { playerVars: PV, events: {
           onReady: () => { slot.p.mute(); if (++n === 2) { ready = 2; show(cur); const f = P.cb; P.cb = null; f && f(); } },
           onStateChange: e => onState(j, e.data) } });
         P[j] = slot; });
     });
   }
-  // silently buffer goal g in player n: load muted, pause the moment it starts, rewind to the clip start
+  // silently buffer goal g in player n: start WARM seconds early, muted and underneath, and let it play up to the
+  // clip start (YouTube climbs to full quality meanwhile); the interval above pauses it right at the clip start
   function prep(n, g){
     const s = P[n]; if (!s || !g) return; const st = startOf(g);
     if (s.want && s.want.id === g.id && s.want.t === st && (s.ok || s.prepping)) return;
-    s.want = { id: g.id, t: st }; s.ok = false; s.prepping = true;
-    try { s.p.mute(); s.p.loadVideoById({ videoId: g.id, startSeconds: st }); } catch (e) { s.prepping = false; }
+    s.want = { id: g.id, t: st }; s.ok = false; s.prepping = true; s.rolling = false;
+    try { s.p.mute(); s.p.loadVideoById({ videoId: g.id, startSeconds: Math.max(0, st - WARM) }); hiQ(s.p); } catch (e) { s.prepping = false; }
   }
   function onState(n, state){
     const s = P[n]; if (!s) return;
-    if (s.prepping && state === 1 && n !== cur) { s.p.pauseVideo(); s.p.seekTo(s.want.t, true); s.prepping = false; s.ok = true; return; }
-    if (s.prepping && state === 1 && n === cur && !playing) { s.p.pauseVideo(); s.p.seekTo(s.want.t, true); s.prepping = false; s.ok = true; return; }
-    if (n === cur && state === 1 && playing) { hiQ(s.p); $('.hlp-cover').classList.remove('loading'); if (reveal) reveal(); }
+    if (s.prepping && state === 1 && !(n === cur && playing)) { s.rolling = true; hiQ(s.p); return; }   // warm-up running
+    if (n === cur && state === 1 && playing) { hiQ(s.p); $('.hlp-cover').classList.remove('loading');
+      if (reveal && s.p.getCurrentTime() >= segEnd - CLIP - 0.5) reveal(); }   // only once it's inside the clip
   }
   const logoFor = g => g.side === 'us' ? teamLogo('Ledus Veči') : teamLogo(g.team);
   function scoreAt(k){ let u = 0, t = 0; for (let j = 0; j <= k; j++) list[j].side === 'us' ? u++ : t++; return G.lvIsHome ? `${u}:${t}` : `${t}:${u}`; }
   // start goal g on player n (instant if it was buffered there)
+  // the sound comes on when the goal card goes away, so the jump is clean
   function startOn(n, g){
-    const s = P[n], st = startOf(g); s.prepping = false;
-    if (s.want && s.want.id === g.id && s.want.t === st && s.ok) { s.p.seekTo(st, true); }
+    const s = P[n], st = startOf(g), mine = s.want && s.want.id === g.id && s.want.t === st;
+    const t = s.p.getCurrentTime ? s.p.getCurrentTime() : 0;
+    if (mine && s.ok) { if (Math.abs(t - st) > 1) s.p.seekTo(st, true); }               // warmed up: play right on, no seek
+    else if (mine && s.prepping && t < st && st - t <= MAX_CATCHUP) { /* still warming: let it roll into the clip under the card */ }
     else if (s.p.getVideoData && s.p.getVideoData().video_id === g.id) { s.p.seekTo(st, true); }
     else { s.p.loadVideoById({ videoId: g.id, startSeconds: st }); }
-    s.want = { id: g.id, t: st }; s.ok = false;
-    s.p.unMute(); s.p.playVideo(); hiQ(s.p);
+    s.want = { id: g.id, t: st }; s.ok = false; s.prepping = false; s.rolling = false;
+    s.p.mute(); s.p.playVideo(); hiQ(s.p);
   }
   function go(k){
     if (k >= list.length) { finish(); return; } i = k; goAt = Date.now(); const g = list[k];
@@ -2697,6 +2713,7 @@ const HL = (function(){
     const shownAt = Date.now();
     let done = false;
     const doReveal = () => { if (done || i !== k) return; done = true; reveal = null;
+      try { if (playing) pl(cur).unMute(); } catch (e) {}
       $('.hlp-card').classList.remove('on'); $('.hlp-fade').classList.remove('on');
       $('.hlp-lower .scb').innerHTML = `<img src="${logoFor(g)}" alt="">${scoreAt(k)}`; $('.hlp-lower .who b').textContent = g.scorer;
       $('.hlp-lower .who small').textContent = g.a.join(', '); $('.hlp-lower').className = 'hlp-lower on ' + g.side;
@@ -2723,9 +2740,9 @@ const HL = (function(){
   function play(){ $('.hlp-big').classList.add('hide'); $('.hlp-cover').classList.remove('on'); playing = true; $('.hlp-pp').textContent = '❚❚';
     const p = pl(cur);
     if (i < 0 || !p || !p.getPlayerState || p.getPlayerState() === 0 || $('.hlp-fade').classList.contains('on')) go(Math.max(0, i < 0 ? 0 : i + (single ? 1 : 0)));
-    else { p.unMute(); p.playVideo(); } }
+    else { if (!reveal) p.unMute(); p.playVideo(); } }
   function pause(){ playing = false; $('.hlp-pp').textContent = '▶'; const p = pl(cur); if (p && p.pauseVideo) p.pauseVideo(); $('.hlp-cover').classList.add('on'); $('.hlp-big').classList.remove('hide'); }
-  function close(){ pause(); reveal = null; P.forEach(s => { try { s.p.stopVideo(); } catch (e) {} s.want = null; s.ok = false; s.prepping = false; }); ov.classList.remove('on'); }
+  function close(){ pause(); reveal = null; P.forEach(s => { try { s.p.stopVideo(); } catch (e) {} s.want = null; s.ok = false; s.prepping = false; s.rolling = false; }); ov.classList.remove('on'); }
   function open(b, k, onlyOne){
     if (!ov) build(); G = b; list = goalsOf(b); if (!list.length) return;
     single = !!onlyOne; i = single ? k - 1 : -1; playing = false;
