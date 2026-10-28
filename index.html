@@ -1460,6 +1460,125 @@ footer{text-align:center;color:var(--text-faint);font-size:12px;padding:20px;}
 /* Highlights button: black and white */
 .pack-btn{background:transparent !important;color:#fff !important;border:1px solid rgba(255,255,255,.7) !important;box-shadow:none !important;letter-spacing:.3px;}
 .pack-btn:hover{background:rgba(255,255,255,.1) !important;color:#fff !important;filter:none !important;}
+/* ---- Nūjas (stick order) ---- */
+
+#sticksView{--dim:var(--text-dim);--faint:var(--text-faint);--mg:#D04BAE;--org:#F39223;--win:#4CC98E;--panel2:#171f29;}
+#sticksView .layout{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:20px;padding:22px 0 40px;align-items:start}
+#sticksView .step{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;margin-bottom:16px}
+#sticksView .step h2{font-family:Oswald,sans-serif;font-size:19px;margin:0 0 4px;display:flex;align-items:center;gap:10px}
+#sticksView .step h2 .n{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--ice);font-size:14px}
+#sticksView .hint{color:var(--dim);font-size:13px;margin:0 0 14px}
+#sticksView .opts{display:grid;gap:10px}
+#sticksView .opt{background:var(--panel2);border:1.5px solid var(--line);border-radius:12px;padding:12px;cursor:pointer;text-align:left;color:var(--text);font:inherit;position:relative}
+#sticksView .opt:hover{border-color:#3a4656}
+#sticksView .opt.on{border-color:var(--mg);background:linear-gradient(180deg,rgba(131,12,103,.22),rgba(131,12,103,.06))}
+#sticksView .opt.on::after{content:'✓';position:absolute;top:8px;right:10px;width:20px;height:20px;border-radius:50%;background:var(--mg);color:#fff;font-size:12px;display:grid;place-items:center}
+#sticksView .opt b{display:block;font-family:Oswald,sans-serif;font-size:18px;font-weight:600}
+#sticksView .opt small{display:none}
+#sticksView #shaft .opt,#sticksView #kick .opt,#sticksView #side .opt,#sticksView #rgMat .opt,#sticksView #rgType .opt{text-align:center}
+#sticksView .tag{display:inline-block;font-size:10px;font-weight:700;color:var(--org);border:1px solid rgba(243,146,35,.5);border-radius:4px;padding:0 5px;margin-left:6px;vertical-align:2px}
+#sticksView .g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+#sticksView .g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+#sticksView .g5{grid-template-columns:repeat(5,minmax(0,1fr))}
+#sticksView .designs{grid-template-columns:repeat(3,minmax(0,1fr))}
+#sticksView .design{padding:10px}
+#sticksView .design .imgbox{width:fit-content;margin:0 auto;position:relative;background:#fff;border-radius:8px;padding:8px}
+#sticksView .design img{height:260px;width:auto;display:block}
+#sticksView .zoom{position:absolute;right:6px;bottom:6px;width:34px;height:34px;border-radius:50%;border:1px solid rgba(255,255,255,.4);background:rgba(10,14,19,.75);color:#fff;font-size:16px;cursor:zoom-in;display:grid;place-items:center}
+#sticksView .zoom:hover{background:var(--ice)}
+#sticksView .lb{position:fixed;inset:0;z-index:100;background:rgba(3,6,10,.93);display:none;align-items:center;justify-content:center;padding:16px}
+#sticksView .lb.on{display:flex}
+#sticksView .lb .wrapimg{max-width:100%;max-height:100%;overflow:auto;border-radius:10px}
+#sticksView .lb img{display:block;background:#fff;max-width:none;height:calc(100vh - 80px);width:auto;cursor:zoom-in;transition:height .2s}
+#sticksView .lb img.big{height:calc(250vh);cursor:zoom-out}
+#sticksView .lb .cls{position:fixed;top:14px;right:14px;width:40px;height:40px;border-radius:50%;border:1px solid var(--line);background:var(--panel2);color:#fff;font-size:18px;cursor:pointer}
+#sticksView .lb .cap{position:fixed;left:0;right:0;bottom:12px;text-align:center;color:var(--dim);font-size:13px}
+#sticksView .design b{margin-top:10px;font-size:15px}
+#sticksView .prow{display:grid;grid-template-columns:minmax(0,1fr) 140px;gap:10px}
+#sticksView select,#sticksView input[type=text]{width:100%;background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:12px;font:500 15px Inter,sans-serif}
+#sticksView .lbl{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;margin:0 0 6px}
+#sticksView .len{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+#sticksView .len button{width:44px;height:44px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-size:22px;cursor:pointer}
+#sticksView .len .v{font-family:Oswald,sans-serif;font-size:44px;font-weight:600;min-width:120px;text-align:center}
+#sticksView .len .v small{font-size:18px;color:var(--dim)}
+#sticksView .len input[type=range]{flex:1;min-width:180px;accent-color:var(--mg)}
+#sticksView .measure{display:flex;gap:14px;margin-top:12px;font-size:12.5px;color:var(--dim);flex-wrap:wrap}
+#sticksView .measure b{color:var(--text)}
+#sticksView .flexes{grid-template-columns:repeat(12,minmax(0,1fr));gap:6px}
+#sticksView .flexes .opt{text-align:center;padding:12px 2px}
+#sticksView .flexes b{font-size:17px}
+#sticksView .flexes .opt::after{display:none}
+#sticksView .flexscale{display:flex;justify-content:space-between;font-size:11px;color:var(--dim);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;background:linear-gradient(90deg,rgba(1,183,240,.25),rgba(243,146,35,.35));border-radius:6px;padding:4px 8px}
+#sticksView .curves{grid-template-columns:repeat(5,minmax(0,1fr))}
+#sticksView .curves .opt{text-align:center;padding:10px 6px}
+#sticksView .curves b{font-size:20px}
+#sticksView .icon{height:56px;display:grid;place-items:center;margin-bottom:8px}
+#sticksView .grip-vis{width:38px;height:86px;border-radius:10px;border:1.5px solid #4a5563;margin:0 auto 8px;background:linear-gradient(90deg,#1b1f25,#3a404a 50%,#1b1f25)}
+#sticksView .grip-vis.tac{background-image:radial-gradient(circle,#F39223 2.2px,transparent 2.6px),linear-gradient(90deg,#1b1f25,#3a404a 50%,#1b1f25);background-size:10px 10px,100% 100%}
+#sticksView .grip-vis.corner{background-image:repeating-linear-gradient(160deg,transparent 0 9px,#F39223 9px 12px,transparent 12px 20px),linear-gradient(90deg,#1b1f25,#3a404a 50%,#1b1f25)}
+#sticksView .free{background:linear-gradient(90deg,#c0392b,#e0452f);border-radius:10px;padding:10px 14px;font-weight:600;font-size:14px;margin-bottom:14px;display:flex;align-items:center;justify-content:center;gap:8px;text-align:center}
+#sticksView .free b{font-family:Oswald,sans-serif;font-size:20px;line-height:1}
+#sticksView .rg-colors{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}
+#sticksView .rgc{border-radius:12px;border:1.5px solid var(--line);background:var(--panel2);cursor:pointer;color:var(--text);font:600 12px Inter,sans-serif;text-align:center;padding:8px;position:relative}
+#sticksView .rgc.on{border-color:var(--mg);background:rgba(131,12,103,.2)}
+#sticksView .rgc .ph{aspect-ratio:1;border-radius:8px;overflow:hidden;background:#fff;margin-bottom:6px;position:relative;display:grid;place-items:center}
+#sticksView .rgc .ph img{width:100%;height:100%;object-fit:cover;position:relative;z-index:1}
+#sticksView .rgc .ph .sw{position:absolute;inset:18% 38%;border-radius:8px;font:700 9px Oswald;display:grid;place-items:center;writing-mode:vertical-rl}
+#sticksView .rg-prev{margin-top:12px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+#sticksView .rg-prev .sleeve{width:220px;height:44px;border-radius:22px;display:flex;align-items:center;justify-content:center;font:700 15px Oswald,sans-serif;letter-spacing:2px;text-transform:uppercase;outline:1px solid #3a4452}
+#sticksView .sockrow{display:grid;grid-template-columns:220px minmax(0,1fr);gap:16px;align-items:center}
+#sticksView .sockrow img{width:100%;border-radius:12px;background:#e9e9e9}
+#sticksView .sizes{grid-template-columns:repeat(4,minmax(0,1fr))}
+#sticksView .sizes .opt{text-align:center}
+#sticksView .sizes b{font-size:24px}
+#sticksView .chk{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--dim);margin-top:10px}
+#sticksView .chk input{width:18px;height:18px;accent-color:var(--mg)}
+#sticksView /* summary: what this player orders,#sticksView and send */
+.sum{position:sticky;top:16px;background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+#sticksView .sum .top{display:flex;gap:12px;padding:16px;background:linear-gradient(135deg,rgba(131,12,103,.5),rgba(131,12,103,.1));border-bottom:1px solid var(--line)}
+#sticksView .sum .top .thumb{width:72px;height:150px;background:#fff;border-radius:8px;overflow:hidden;flex-shrink:0;display:flex;justify-content:center;padding:4px}
+#sticksView .sum .top .thumb img{height:100%;width:auto}
+#sticksView .sum .who{font-family:Oswald,sans-serif;font-size:22px;font-weight:600}
+#sticksView .sum .dz{font-size:12px;color:#e9cfe2;margin-top:4px}
+#sticksView .sum dl{margin:0;padding:8px 16px 4px;display:grid;grid-template-columns:auto 1fr}
+#sticksView .sum dt,#sticksView .sum dd{padding:8px 0;border-bottom:1px solid var(--line);font-size:14px;margin:0}
+#sticksView .sum dt{color:var(--dim)}
+#sticksView .sum dd{text-align:right;font-weight:600}
+#sticksView .sum dd.miss{color:var(--org);font-weight:500}
+#sticksView .tot{margin:6px 16px 0;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px}
+#sticksView .tot h3{margin:0 0 8px;font:600 14px Inter,sans-serif;color:var(--dim);text-transform:uppercase;letter-spacing:.5px}
+#sticksView .tot div{display:flex;justify-content:space-between;padding:4px 0;font-size:15px}
+#sticksView .tot div b{font-family:Oswald,sans-serif;font-size:20px}
+#sticksView .act{padding:16px;display:grid;gap:8px}
+#sticksView .btn{border:none;border-radius:10px;padding:14px;font:700 15px Inter,sans-serif;cursor:pointer;color:#fff;background:var(--ice)}
+#sticksView .btn:disabled{opacity:.4;cursor:not-allowed}
+#sticksView .sent{display:none;padding:16px;text-align:center}
+#sticksView .sent.on{display:block}
+#sticksView .sent .ok{width:56px;height:56px;border-radius:50%;background:rgba(76,201,142,.15);color:var(--win);display:grid;place-items:center;font-size:28px;margin:0 auto 10px}
+#sticksView .sent p{color:var(--dim);font-size:13px;margin:6px 0 0}
+@media (max-width:1100px){#sticksView .layout{grid-template-columns:1fr}
+#sticksView .sum{position:static}}
+@media (max-width:640px){#sticksView .designs{gap:6px}
+#sticksView .design .imgbox{height:170px}
+#sticksView .design b{font-size:12px}
+#sticksView .curves,#sticksView .sizes,#sticksView .g5{grid-template-columns:repeat(2,minmax(0,1fr))}
+#sticksView .flexes{grid-template-columns:repeat(6,minmax(0,1fr))}
+#sticksView .prow{grid-template-columns:1fr}
+#sticksView .sockrow{grid-template-columns:1fr}
+#sticksView .sockrow img{max-width:220px}}
+#sticksView .sec-t{margin:14px 16px 4px;font:700 12px Inter,sans-serif;color:var(--dim);text-transform:uppercase;letter-spacing:.6px}
+#sticksView .addrow{display:grid;grid-template-columns:96px 1fr;gap:8px;padding:8px 16px 4px}
+#sticksView .addrow select{padding:10px}
+#sticksView .addrow .btn{padding:11px}
+#sticksView .cart{padding:0 16px;display:grid;gap:8px}
+#sticksView .cart .empty{color:var(--dim);font-size:13px;padding:6px 0}
+#sticksView .cline{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 34px 10px 12px;position:relative;font-size:13px;line-height:1.45}
+#sticksView .cline b{font-family:Oswald,sans-serif;font-size:16px;font-weight:600}
+#sticksView .cline small{color:var(--dim);display:block}
+#sticksView .cline .x{position:absolute;top:8px;right:8px;width:22px;height:22px;border-radius:50%;border:1px solid var(--line);background:none;color:var(--dim);cursor:pointer;font-size:12px}
+#sticksView .cline .x:hover{color:#fff;border-color:var(--mg)}
+#sticksView .sockq .v{font-size:34px;min-width:100px}
+@media (max-width:700px){#sticksView .design .imgbox{width:100% !important;height:auto !important;padding:4px !important}#sticksView .design img{width:100% !important;height:auto !important}#sticksView .design b{font-size:12px}#sticksView .zoom{width:28px;height:28px;font-size:13px}#sticksView .designs{gap:6px}}
 </style>
 </head>
 <body>
@@ -1473,6 +1592,7 @@ footer{text-align:center;color:var(--text-faint);font-size:12px;padding:20px;}
     <button class="main-btn" data-section="lv2">Ledus Veči II statistika</button>
     <button class="main-btn" data-section="lv3">Ledus Veči III statistika</button>
     <button class="main-btn" data-section="calendar">Calendar</button>
+    <button class="main-btn" data-section="sticks">Barrel nūjas</button>
   </nav>
 </div></div>
 <div id="statsBar" class="hidden"><div class="subtabs">
@@ -1714,6 +1834,43 @@ footer{text-align:center;color:var(--text-faint);font-size:12px;padding:20px;}
 <div id="lv2View" class="club-view hidden" data-div="E7"></div>
 <div id="lv3View" class="club-view hidden" data-div="E9"></div>
 
+<div id="sticksView" class="wrap hidden" style="padding-top:20px;"><div class="layout"><main>
+ <section class="step"><h2><span class="n">1</span>Dizains</h2><p class="hint">Komandas nūjas dizains.</p><div class="opts designs" id="so-designs"></div></section>
+ <section class="step"><h2><span class="n">2</span>Spēlētājs</h2><p class="hint">Izvēlies sevi sarakstā. Tālāk saliec savu nūju un pievieno to pasūtījumam. Vari pievienot vairākas nūjas ar dažādiem parametriem.</p>
+  <div class="prow" style="grid-template-columns:1fr"><select id="so-player"><option value="">Izvēlies spēlētāju</option></select></div></section>
+ <section class="step"><h2><span class="n">3</span>Vārds un numurs uz nūjas</h2><p class="hint">Uzdruka uz nūjas kāta.</p>
+  <div class="prow"><input type="text" id="so-pname" maxlength="16" placeholder="Vārds, uzvārds vai iesauka"><input type="text" id="so-pnr" maxlength="3" placeholder="Numurs"></div></section>
+ <section class="step"><h2><span class="n">4</span>Garums</h2><p class="hint">Nūju noliek <b>paralēli sienai</b> un mēra <b>no grīdas līdz nūjas augšai</b>.</p>
+  <div class="len"><button type="button" id="so-lm">−</button><div class="v"><span id="so-lv">170</span> <small>cm</small></div><button type="button" id="so-lp">+</button><input type="range" id="so-lr" min="160" max="185" value="170"></div>
+  <div class="measure"><span>Griezuma pielaide <b>±1 cm</b></span><span>Nūju saīsinot, <b>flex kļūst stingrāks</b></span></div></section>
+ <section class="step"><h2><span class="n">5</span>Flex</h2><div class="flexscale"><span>mīkstāks</span><span>stingrāks</span></div><div class="opts flexes" id="so-flex"></div></section>
+ <section class="step"><h2><span class="n">6</span>Ieliekums</h2><p class="hint">M nozīmē Max Height: tas pats ieliekums un gals, tikai augstāka lāpstiņa ar plakanāku apakšmalu.</p><div class="opts curves" id="so-curve"></div></section>
+ <section class="step"><h2><span class="n">7</span>Puse</h2><p class="hint">Nosaka roka, kas nūju satver <b>zemāk</b>, tāpat kā tu turi savu esošo nūju.</p><div class="opts g2" id="so-side"></div></section>
+ <section class="step"><h2><span class="n">8</span>Kāts</h2><p class="hint">Kāta forma rokā.</p><div class="opts g2" id="so-shaft"></div></section>
+ <section class="step"><h2><span class="n">9</span>Kickpoint</h2><p class="hint">Vieta, kur nūja visvairāk saliecas metienā.</p><div class="opts g3" id="so-kick"></div></section>
+ <section class="step"><h2><span class="n">10</span>Kāta virsma (Barrel)</h2><p class="hint">Kāta augšdaļas virsma. Tekstūra neietekmē nūjas svaru vai flex.</p><div class="opts g3" id="so-grip"></div></section>
+ <section class="step"><h2><span class="n">11</span>RocketGrip gripi</h2><div class="free"><b>2×</b>gripi bez maksas pie katras nūjas (1 iepakojums = 2 gripi)</div>
+  <div class="lbl">Materiāls</div><div class="opts g3" id="so-rgMat" style="margin-bottom:14px"></div>
+  <div class="lbl">Dizains</div><div class="opts g3" id="so-rgType" style="margin-bottom:14px"></div>
+  <div class="lbl">Krāsa</div><div class="rg-colors" id="so-rgColor"></div>
+  <div class="lbl" style="margin-top:16px">Vārds un numurs uz gripa (bez maksas)</div>
+  <div class="prow"><input type="text" id="so-rgName" maxlength="14" placeholder="Vārds vai iesauka"><input type="text" id="so-rgNr" maxlength="3" placeholder="Numurs"></div>
+  <label class="chk" style="margin-top:12px"><input type="checkbox" id="so-rgLogo" checked> Pievienot <b style="color:var(--text);margin:0 3px">LDV logo</b> uz gripa (bez maksas)</label>
+  <div class="rg-prev" id="so-rgPrev"></div></section>
+ <section class="step"><h2><span class="n">12</span>Hokeja zeķes</h2><p class="hint">Ar tavu numuru un komandas logo.</p>
+  <div class="sockrow"><img src="data:image/webp;base64,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" alt="Hokeja zeķes"><div><div class="opts sizes" id="so-socks"></div><div class="lbl" style="margin-top:14px">Pāru skaits</div><div class="len sockq"><button type="button" id="so-sm">−</button><div class="v"><span id="so-sv">1</span> <small>pāri</small></div><button type="button" id="so-sp">+</button></div></div></div></section>
+</main>
+<aside><div class="sum">
+  <div class="top"><div class="thumb"><img id="so-sumImg" src="" alt=""></div><div><div class="who" id="so-sumWho">Spēlētājs nav izvēlēts</div><div class="dz" id="so-sumDz"></div></div></div>
+  <div class="sec-t">Šī nūja</div>
+  <dl id="so-sumList"></dl>
+  <div class="addrow"><select id="so-qty"><option value="1">1 gab.</option><option value="2">2 gab.</option><option value="3">3 gab.</option><option value="4">4 gab.</option><option value="5">5 gab.</option></select><button class="btn" id="so-add" disabled>+ Pievienot nūju</button></div>
+  <div class="sec-t">Tavs pasūtījums</div>
+  <div class="cart" id="so-cart"></div>
+  <div class="tot"><div><span>Barrel nūjas</span><b id="so-tSticks">0</b></div><div><span>RocketGrip iepakojumi (bez maksas)</span><b id="so-tGrips">0</b></div><div><span>Zeķu pāri</span><b id="so-tSocks">1</b></div></div>
+  <div class="act"><button class="btn" id="so-send" disabled>Nosūtīt pasūtījumu</button></div>
+  <div class="sent" id="so-sent"><div class="ok">✓</div><b>Paldies, pasūtījums nosūtīts!</b><p>Tas ir saglabāts nūju pasūtījumu failā kopā ar pārējo spēlētāju pasūtījumiem.</p></div>
+</div></aside></div><div class="lb" id="so-lb"><button class="cls" id="so-lbx">✕</button><div class="wrapimg"><img id="so-lbimg" alt=""></div><div class="cap" id="so-lbcap"></div></div></div>
 <div id="calendarView" class="wrap hidden" style="padding-top:20px;">
   <div class="cal-layout">
     <div>
