@@ -2585,6 +2585,9 @@ const HL = (function(){
   // start. YouTube always starts a video in low quality and steps up after a few seconds - this way the step-up
   // happens during the warm-up, and the clip itself is already buffered in full quality when it's shown.
   const WARM = 8, MAX_CATCHUP = 3;
+  // CTRL_HIDE: while a video plays, the bottom bar (pause button, timeline) fades out this many ms after the last
+  // mouse move / tap; moving the mouse or tapping the video brings it back. While paused it always stays.
+  const CTRL_HIDE = 900;
   const vidOf = u => (String(u || '').match(/(?:v=|youtu\.be\/|embed\/)([\w-]{11})/) || [])[1] || null;
   const secOf = u => { const m = String(u || '').match(/[?&]t=(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s?)?/); return m ? (+m[1] || 0) * 3600 + (+m[2] || 0) * 60 + (+m[3] || 0) : 0; };
   const PV = { controls: 0, disablekb: 1, modestbranding: 1, rel: 0, playsinline: 1, iv_load_policy: 3, vq: 'hd1080' };
@@ -2610,7 +2613,8 @@ const HL = (function(){
   const hiQ = p => { try { p.setPlaybackQuality('highres'); } catch (e) {} };
   // small loading spinner on the black cover (only visible while a video is still loading)
   (function(){ const st = document.createElement('style');
-    st.textContent = '.hlp-cover.loading::after{content:"";position:absolute;left:50%;top:50%;width:38px;height:38px;margin:-19px 0 0 -19px;border:3px solid rgba(255,255,255,.25);border-top-color:#fff;border-radius:50%;animation:hlpSpin .8s linear infinite}@keyframes hlpSpin{to{transform:rotate(360deg)}}@media (prefers-reduced-motion:reduce){.hlp-cover.loading::after{animation-duration:2.4s}}';
+    st.textContent = '.hlp-cover.loading::after{content:"";position:absolute;left:50%;top:50%;width:38px;height:38px;margin:-19px 0 0 -19px;border:3px solid rgba(255,255,255,.25);border-top-color:#fff;border-radius:50%;animation:hlpSpin .8s linear infinite}@keyframes hlpSpin{to{transform:rotate(360deg)}}@media (prefers-reduced-motion:reduce){.hlp-cover.loading::after{animation-duration:2.4s}}' +
+      '.hlp-ctrl{transition:opacity .15s}.hlp-player.ctrl-hide .hlp-ctrl{opacity:0;pointer-events:none}.hlp-player.ctrl-hide{cursor:none}.hlp-big{transition:opacity .1s !important}';
     document.head.appendChild(st); })();
 
   // all goals of one game that have a video time, in the order they happened
@@ -2629,10 +2633,13 @@ const HL = (function(){
 
   // ---- two players: one plays, the other quietly buffers the next goal ----
   let ov, P = [], cur = 0, ready = 0, G = null, list = [], i = -1, playing = false, segEnd = 0, single = false;
-  let goAt = 0, reveal = null; // pending "remove the card once the video really plays"
+  let goAt = 0, ctrlT = 0, reveal = null; // pending "remove the card once the video really plays"
   const $ = s => ov.querySelector(s);
   const startOf = g => Math.max(0, g.t - PRE);
   const pl = n => P[n] && P[n].p;
+  // bottom bar: show now, hide again shortly if a video is playing
+  function poke(){ const box = $('.hlp-player'); box.classList.remove('ctrl-hide'); clearTimeout(ctrlT);
+    if (playing) ctrlT = setTimeout(() => { if (playing) box.classList.add('ctrl-hide'); }, CTRL_HIDE); }
   function build(){
     ov = document.createElement('div'); ov.className = 'hlp-ov';
     ov.innerHTML = `<div class="hlp"><button class="hlp-close" title="Aizvērt">✕</button>
@@ -2645,7 +2652,8 @@ const HL = (function(){
     document.body.appendChild(ov);
     $('.hlp-close').onclick = close; ov.addEventListener('click', e => { if (e.target === ov) close(); });
     $('.hlp-big').onclick = play; $('.hlp-pp').onclick = () => playing ? pause() : play();
-    $('.hlp-tl').addEventListener('click', e => { const d = e.target.closest('.dot'); if (d) { single = false; $('.hlp-big').classList.add('hide'); $('.hlp-cover').classList.remove('on'); playing = true; go(+d.dataset.k); } });
+    ['mousemove', 'touchstart', 'click'].forEach(ev => $('.hlp-player').addEventListener(ev, poke, { passive: true }));
+    $('.hlp-tl').addEventListener('click', e => { const d = e.target.closest('.dot'); if (d) { single = false; $('.hlp-big').classList.add('hide'); $('.hlp-cover').classList.remove('on'); playing = true; poke(); go(+d.dataset.k); } });
     document.addEventListener('keydown', e => { if (!ov.classList.contains('on')) return;
       if (e.key === 'Escape') close(); if (e.key === ' ') { e.preventDefault(); playing ? pause() : play(); }
       if (e.key === 'ArrowRight' && i >= 0 && i < list.length - 1) go(i + 1); if (e.key === 'ArrowLeft' && i > 0) go(i - 1); });
@@ -2732,16 +2740,17 @@ const HL = (function(){
       startOn(cur, g);
     });
   }
-  function finish(){ playing = false; reveal = null; P.forEach(s => { try { s.p.pauseVideo(); } catch (e) {} }); $('.hlp-lower').classList.remove('on');
+  function finish(){ if (single) { close(); return; }   // one goal only: close when it's done
+    playing = false; poke(); reveal = null; P.forEach(s => { try { s.p.pauseVideo(); } catch (e) {} }); $('.hlp-lower').classList.remove('on');
     $('.hlp-card img').style.display = 'none'; $('.hlp-card .sc').textContent = `${G.htGoals}:${G.atGoals}`;
     $('.hlp-card .nm').textContent = single ? 'Vārtu klips beidzās' : 'Spēles beigas'; $('.hlp-card .as').textContent = `${G.homeTeam} – ${G.awayTeam}`;
     $('.hlp-card').classList.add('on'); $('.hlp-fade').classList.add('on'); $('.hlp-cover').classList.add('on'); $('.hlp-big').classList.remove('hide'); $('.hlp-pp').textContent = '▶';
     i = -1; if (list[0]) makePlayers(() => prep(cur, list[0])); }
-  function play(){ $('.hlp-big').classList.add('hide'); $('.hlp-cover').classList.remove('on'); playing = true; $('.hlp-pp').textContent = '❚❚';
+  function play(){ $('.hlp-big').classList.add('hide'); $('.hlp-cover').classList.remove('on'); playing = true; $('.hlp-pp').textContent = '❚❚'; poke();
     const p = pl(cur);
     if (i < 0 || !p || !p.getPlayerState || p.getPlayerState() === 0 || $('.hlp-fade').classList.contains('on')) go(Math.max(0, i < 0 ? 0 : i + (single ? 1 : 0)));
     else { if (!reveal) p.unMute(); p.playVideo(); } }
-  function pause(){ playing = false; $('.hlp-pp').textContent = '▶'; const p = pl(cur); if (p && p.pauseVideo) p.pauseVideo(); $('.hlp-cover').classList.add('on'); $('.hlp-big').classList.remove('hide'); }
+  function pause(){ playing = false; poke(); $('.hlp-pp').textContent = '▶'; const p = pl(cur); if (p && p.pauseVideo) p.pauseVideo(); $('.hlp-cover').classList.add('on'); $('.hlp-big').classList.remove('hide'); }
   function close(){ pause(); reveal = null; P.forEach(s => { try { s.p.stopVideo(); } catch (e) {} s.want = null; s.ok = false; s.prepping = false; s.rolling = false; }); ov.classList.remove('on'); }
   function open(b, k, onlyOne){
     if (!ov) build(); G = b; list = goalsOf(b); if (!list.length) return;
@@ -2777,7 +2786,10 @@ const HL = (function(){
         events: { onReady: () => clipStart(),
           onStateChange: e => { const c = clipOv.querySelector('.hlp-cover');
             if (e.data === 1) { c.classList.remove('on', 'loading'); hiQ(clipP); }      // playing
-            if (e.data === 0 || e.data === 2) { c.classList.add('on'); c.classList.remove('loading'); clipOv.querySelector('.clip-again').style.display = ''; } } } }); };
+            // clip finished -> close the player (a pause before the end keeps the ↻ button as before)
+            const end = clipArgs[1] + CLIP, tNow = clipP.getCurrentTime ? clipP.getCurrentTime() : 0;
+            if (e.data === 0 || (e.data === 2 && tNow >= end - 0.5)) { clipShut(); return; }
+            if (e.data === 2) { c.classList.add('on'); c.classList.remove('loading'); clipOv.querySelector('.clip-again').style.display = ''; } } } }); };
     ensureApi(make);
   }
   // E5 ▶ video links open here instead of on YouTube
