@@ -2725,7 +2725,7 @@ function draw(){
   opts('rgMat',[{v:'Rubber',d:'Klasiskā sajūta, maksimāla saķere'},{v:'Fabric',d:'Kā tape, bez līmes'},{v:'Hole',d:'Perforēts, vieglāks un elpojošs'}],'rgMat');
   opts('rgType',[{v:'Color',d:'Vienkrāsas ar tekstu'},{v:'XDesign',d:'Ar X rakstu'},{v:'Flag',d:'Valsts karogs'}],'rgType');
   const list=RG[S.rgType]; if(!list.some(c=>c.n===S.rgColor)) S.rgColor=list[0].n;
-  $('rgColor').innerHTML=list.map(c=>`<button type="button" class="rgc ${S.rgColor===c.n?'on':''}" data-rgc="${esc(c.n)}"><div class="ph"><span class="sw" style="background:${c.bg};color:${c.fg}">ROCKETGRIP</span>${c.img?`<img src="${c.img}" alt="" loading="lazy" onerror="this.remove()">`:''}</div>${esc(c.n)}</button>`).join('');
+  $('rgColor').innerHTML=list.map(c=>`<button type="button" class="rgc ${S.rgColor===c.n?'on':''}" data-rgc="${esc(c.n)}"><div class="ph"><span class="sw" style="background:${c.bg};color:${c.fg}">ROCKETGRIP</span>${c.img?`<img src="${c.img}" alt="" loading="lazy" onerror="this.remove()"><span class="zoom rgz" data-rgzoom="${esc(c.n)}" title="Palielināt">⤢</span>`:''}</div>${esc(c.n)}</button>`).join('');
   const cur=list.find(c=>c.n===S.rgColor)||list[0];
   $('rgPrev').innerHTML=`<div class="sleeve" style="background:${cur.bg};color:${cur.fg};gap:8px">${S.rgLogo?`<img src="${LDV_LOGO}" alt="" style="width:28px;height:28px;object-fit:contain">`:''}${esc(S.rgName)||'&nbsp;'} ${esc(S.rgNr)}</div><span style="color:var(--dim);font-size:13px">${S.rgMat} · ${S.rgType} · ${esc(S.rgColor)}</span>`;
   opts('socks',['S','M','L','XL'].map(v=>({v})),'socks');
@@ -2750,6 +2750,7 @@ function summary(){
 }
 document.addEventListener('click',e=>{
   if(!e.target.closest('#sticksView')) return;
+  const rz=e.target.closest('[data-rgzoom]'); if(rz){ e.stopPropagation(); const c=RG[S.rgType].find(x=>x.n===rz.dataset.rgzoom); if(c&&c.img){ $('lbimg').src=c.img.replace('width=300','width=1080'); $('lbimg').classList.remove('big'); $('lbcap').textContent='RocketGrip · '+c.n+' · klikšķini uz attēla, lai pietuvinātu'; $('lb').classList.add('on'); } return; }
   const z=e.target.closest('[data-zoom]'); if(z){ e.stopPropagation(); const d=DESIGNS.find(x=>x.id===z.dataset.zoom); $('lbimg').src=d.full||d.img; $('lbimg').classList.remove('big'); $('lbcap').textContent=d.name+' · Barrel dizaina lapa · klikšķini uz attēla, lai pietuvinātu'; $('lb').classList.add('on'); return; }
   if(e.target.id==='so-lbimg'){ e.target.classList.toggle('big'); return; }
   if(e.target.id==='so-lb'||e.target.id==='so-lbx'){ $('lb').classList.remove('on'); return; }
