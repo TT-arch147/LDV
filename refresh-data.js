@@ -837,8 +837,10 @@ async function fetchPracticeExtras(previous) {
       for (const url of urls) {
         const old = known[url];
         if (old && old.v === 4 && old.played && old.date < weekAgo) continue;   // finished, settled, read with the current reader
-        if (old && !old.played && old.date > todayIso) continue;        // still in the future
-        try { const gm = parseProtocol(await getHtml(url), url, OUR_CLUB[div]); if (gm) { known[url] = gm; read++; } } catch (e) { /* keep the old copy */ }
+        // a game still to come: read it again at most once a day, because EHL moves dates (a game first listed on
+        // 1 July, EHL's placeholder, gets its real date later)
+        if (old && !old.played && old.date > todayIso && old.readAt && Date.now() - Date.parse(old.readAt) < 20 * 3600e3) continue;
+        try { const gm = parseProtocol(await getHtml(url), url, OUR_CLUB[div]); if (gm) { gm.readAt = new Date().toISOString(); known[url] = gm; read++; } } catch (e) { /* keep the old copy */ }
       }
       // earlier seasons, collected once by the "Collect EHL history" job
       try {
@@ -859,7 +861,9 @@ async function fetchPracticeExtras(previous) {
         const byProt = {}; (club[div].games || []).forEach(gm => { if (gm.protocol) byProt[gm.protocol] = gm; });
         clubGames[div].forEach(gm => {
           const row = byProt[gm.protocol] || {};
-          Object.assign(row, { date: gm.date, time: gm.time || row.time, arena: gm.arena || row.arena, home: { ...(row.home || {}), abbr: gm.home.abbr, id: gm.home.id },
+          // games still to come: the team calendar (read fresh every run) knows the current date, time and rink
+          const fresh = !gm.played && row.date;
+          Object.assign(row, { date: fresh ? row.date : gm.date, time: (fresh && row.time) || gm.time || row.time, arena: (fresh && row.arena) || gm.arena || row.arena, home: { ...(row.home || {}), abbr: gm.home.abbr, id: gm.home.id },
             away: { ...(row.away || {}), abbr: gm.away.abbr, id: gm.away.id }, played: gm.played, hg: gm.hg, ag: gm.ag, protocol: gm.protocol });
           if (!byProt[gm.protocol]) club[div].games.push(row);
           club[div].names = club[div].names || {};
