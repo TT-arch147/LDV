@@ -846,7 +846,7 @@ function renderRadarChart(player, season, isGoalie){
 // ---------------- one player, several teams ----------------
 // A player can play for Ledus Veči (E5), II (E7) and III (E9). Teams are matched by EHL person id, then by name.
 const TEAM_LABEL = { E5: 'Ledus Veči', E7: 'Ledus Veči II', E9: 'Ledus Veči III' };
-const personIdOf = url => ((String(url || '').match(/\/personas\/[a-z0-9-]+\/(\d+)/) || [])[1]) || null;
+const personIdOf = url => ((String(url || '').match(/\/personas\/[^\/]+\/(\d+)/) || [])[1]) || null;
 function playerTeams(name, ehl){
   const id = personIdOf(ehl || (ROSTER_BY_NAME[name] && ROSTER_BY_NAME[name].ehl)), out = [];
   const inE5 = DATA.skaterRows.some(r => r.player === name) || (DATA.goalieRows || []).some(r => r.player === name) || !!ROSTER_BY_NAME[name];
@@ -1179,7 +1179,7 @@ const POS_GROUPS = [
 // Only this season's players: those listed on Ledus Veči's EHL team page (collected by refresh-data.js).
 // Until that list exists, everyone in the roster sheet is shown.
 const EHL_E5_IDS = new Set(((DATA.teamRosters && DATA.teamRosters.teams && DATA.teamRosters.teams.E5) || []).map(String));
-const personId = url => ((String(url || '').match(/\/personas\/[a-z0-9-]+\/(\d+)/) || [])[1]);
+const personId = url => ((String(url || '').match(/\/personas\/[^\/]+\/(\d+)/) || [])[1]);
 // this season's Ledus Veči players: on the EHL roster, or played a game this season (EHL's roster list can lag behind)
 const PLAYED_THIS_SEASON = (() => { const last = DATA.boxscores.map(b => b.season).filter(Boolean).sort().pop() || '';
   const yrs = (last.match(/\d{4}-\d{4}/) || [''])[0], s = new Set();
@@ -1586,7 +1586,11 @@ renderStatsTab();
     // players on this season's EHL roster who aren't in the roster sheet (birthday + name day from their EHL profile)
     const R = DATA.teamRosters || {}, ehlIds = [...new Set(['E5', 'E7', 'E9'].flatMap(d => (R.teams && R.teams[d]) || []).map(String))];
     const seenNames = new Set(rosterNames);
-    ehlIds.forEach(id => { const pp = R.people && R.people[id]; if (!pp || seenNames.has(pp.name)) return; seenNames.add(pp.name);
+    // the same person can be spelled differently on EHL ("Jānis Parādnieks (jr.)"), so match by EHL id first
+    const sheetById = {}; (DATA.roster || []).forEach(p => { const i = personId(p.ehl); if (i) sheetById[i] = p.name; });
+    ehlIds.forEach(id => { const pp0 = R.people && R.people[id]; if (!pp0) return;
+      const pp = sheetById[id] ? Object.assign({}, pp0, { name: sheetById[id] }) : pp0;
+      if (seenNames.has(pp.name)) return; seenNames.add(pp.name);
       if (pp.birthday && pp.birthday.slice(5) === md) out.push({ type: 'bday', name: pp.name, short: firstName(pp.name), text: `Birthday: ${pp.name}` });
       if (pp.nameDay && pp.nameDay.d === md) out.push({ type: 'nday', name: pp.name, short: firstName(pp.name), text: `Name day: ${pp.name}${pp.nameDay.special ? ' (day of uncommon names)' : ''}` });
     });
@@ -2154,7 +2158,7 @@ document.getElementById('statsTeamSelect') && document.getElementById('statsTeam
   const sgn = v => v > 0 ? '+' + v : String(v);
   const POS = [['F', 'Uzbrucēji'], ['D', 'Aizsargi'], ['G', 'Vārtsargi']];
   const POSL = { F: 'FWD', D: 'DEF', G: 'GK' };
-  const photo = (ehl, size = 'px150') => { const id = (String(ehl || '').match(/\/personas\/[a-z0-9-]+\/(\d+)/) || [])[1];
+  const photo = (ehl, size = 'px150') => { const id = (String(ehl || '').match(/\/personas\/[^\/]+\/(\d+)/) || [])[1];
     return id ? `https://ehl.entuziasti.com/uploads/player/${size}/player_${id}.jpg` : null; };
   const plink = n => n ? `<a href="#" class="player-link" data-player="${esc(n)}">${esc(n)}</a>` : '';
   const imgOrPh = (src, cls) => src ? `<img class="${cls}" src="${src}" alt="" onerror="this.outerHTML='<div class=&quot;${cls} ph&quot;></div>'">` : `<div class="${cls} ph"></div>`;
@@ -2704,7 +2708,8 @@ function stickRoster(){
   const out = [], seen = new Set();
   (DATA.roster || []).forEach(p => { if (seen.has(p.name)) return; seen.add(p.name); out.push({ name: p.name, nr: p.nr }); });
   const R = DATA.teamRosters || {};
-  ['E5', 'E7', 'E9'].forEach(d => ((R.teams && R.teams[d]) || []).forEach(id => { const pp = R.people && R.people[id]; if (!pp || seen.has(pp.name)) return;
+  const sheetIds = new Set((DATA.roster || []).map(p => personId(p.ehl)).filter(Boolean));
+  ['E5', 'E7', 'E9'].forEach(d => ((R.teams && R.teams[d]) || []).forEach(id => { const pp = R.people && R.people[id]; if (!pp || seen.has(pp.name) || sheetIds.has(String(id))) return;
     seen.add(pp.name); const cp = ['E7', 'E9'].map(x => ((DATA.clubPlayers || {})[x] || []).find(y => y.name === pp.name)).find(Boolean);
     out.push({ name: pp.name, nr: cp ? cp.nr : null }); }));
   return out.sort((a, b) => a.name.localeCompare(b.name, 'lv'));
