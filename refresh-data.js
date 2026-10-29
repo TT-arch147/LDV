@@ -657,8 +657,8 @@ async function fetchClubTeams(previous) {
 // Team pages are re-read once a day; each player's profile is only opened once, ever.
 async function fetchTeamRosters(club, previous) {
   const prev = previous || { people: {}, teams: {} };
-  const out = { people: { ...(prev.people || {}) }, teams: { ...(prev.teams || {}) }, fetchedAt: prev.fetchedAt || null };
-  const complete = ['E5', 'E7', 'E9'].every(d => ((prev.teams || {})[d] || []).length) && Object.values(prev.people || {}).every(p => p.v === 3);
+  const out = { people: { ...(prev.people || {}) }, teams: { ...(prev.teams || {}) }, fetchedAt: prev.fetchedAt || null, slugFix: 1 };
+  const complete = ['E5', 'E7', 'E9'].every(d => ((prev.teams || {})[d] || []).length) && Object.values(prev.people || {}).every(p => p.v === 3) && prev.slugFix === 1;
   if (complete && prev.fetchedAt && Date.now() - new Date(prev.fetchedAt) < 20 * 3600 * 1000) { console.log('team rosters: fresh (less than a day old), skipped'); return prev; }
   let list = {};
   try { list = JSON.parse(fs.readFileSync(path.join(__dirname, 'namedays.json'), 'utf8')); } catch (e) {}
@@ -670,20 +670,20 @@ async function fetchTeamRosters(club, previous) {
       const html = await getHtml(`${EHL}/komandas/${CLUB_TEAMS.find(t => t.div === div).slug}/${team.id}`);
       // player links are relative (/personas/name/personId/teamSeasonId). The page also lists other teams'
       // top scorers in a sidebar, so keep only links with this team's own season id (the most common one).
-      const all = [...html.matchAll(/href="(?:https?:\/\/ehl\.entuziasti\.com)?\/personas\/([a-z0-9-]+)\/(\d+)\/(\d+)"/g)];
+      const all = [...html.matchAll(/href="(?:https?:\/\/ehl\.entuziasti\.com)?\/personas\/([^\/"]+)\/(\d+)\/(\d+)"/g)];   // any name slug (e.g. "...-jr.")
       const cnt = {}; all.forEach(m => cnt[m[3]] = (cnt[m[3]] || 0) + 1);
       const ownTeam = Object.entries(cnt).sort((x, y) => y[1] - x[1])[0]?.[0];
       const links = [...new Set(all.filter(m => m[3] === ownTeam).map(m => `${EHL}/personas/${m[1]}/${m[2]}/${m[3]}`))];
       if (!links.length) console.log(`team roster ${div}: no player links found; sample:`, (html.match(/personas[^"]{0,80}/) || ['(none)'])[0]);
       const ids = [];
       for (const url of links) {
-        const pid = url.match(/\/personas\/[a-z0-9-]+\/(\d+)/)[1];
+        const pid = url.match(/\/personas\/[^\/]+\/(\d+)/)[1];
         ids.push(pid);
         if (out.people[pid] && out.people[pid].v === 3) continue;   // v3 = also has height / weight / hand / photo
         try {
           const ph = await getHtml(url);
           const nm = (ph.match(/<h1[^>]*>\s*([^<]{3,60}?)\s*<\/h1>/) || ph.match(/<h2[^>]*class="[^"]*name[^"]*"[^>]*>\s*([^<]{3,60}?)\s*<\/h2>/) || [])[1];
-          const slugName = url.match(/\/personas\/([a-z0-9-]+)\//)[1].split('-').map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
+          const slugName = decodeURIComponent(url.match(/\/personas\/([^\/]+)\//)[1]).split('-').filter(Boolean).map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
           const b = ph.match(/Dzim\S*\s+dati[\s\S]{0,300}?(\d{1,2})\.(\d{1,2})\.(\d{4})/i);
           // profile table rows look like <td>Augums</td><td>187&nbsp;cm</td>
           const field = label => { const m = ph.match(new RegExp(`<td>\\s*${label}\\s*</td>\\s*<td>([\\s\\S]*?)</td>`, 'i'));

@@ -1180,7 +1180,12 @@ const POS_GROUPS = [
 // Until that list exists, everyone in the roster sheet is shown.
 const EHL_E5_IDS = new Set(((DATA.teamRosters && DATA.teamRosters.teams && DATA.teamRosters.teams.E5) || []).map(String));
 const personId = url => ((String(url || '').match(/\/personas\/[a-z0-9-]+\/(\d+)/) || [])[1]);
-const CURRENT_ROSTER = EHL_E5_IDS.size ? DATA.roster.filter(p => EHL_E5_IDS.has(personId(p.ehl))) : DATA.roster;
+// this season's Ledus Veči players: on the EHL roster, or played a game this season (EHL's roster list can lag behind)
+const PLAYED_THIS_SEASON = (() => { const last = DATA.boxscores.map(b => b.season).filter(Boolean).sort().pop() || '';
+  const yrs = (last.match(/\d{4}-\d{4}/) || [''])[0], s = new Set();
+  DATA.skaterRows.concat(DATA.goalieRows || []).forEach(r => { if (yrs && String(r.season || '').includes(yrs)) s.add(r.player || r.goalie); });
+  return s; })();
+const CURRENT_ROSTER = EHL_E5_IDS.size ? DATA.roster.filter(p => EHL_E5_IDS.has(personId(p.ehl)) || PLAYED_THIS_SEASON.has(p.name)) : DATA.roster;
 // games played (the GP shown on each card: all seasons, skaters + goalies), most games first
 const ROSTER_GP = {};
 DATA.skaterRows.concat(DATA.goalieRows || []).forEach(r => { ROSTER_GP[r.player] = (ROSTER_GP[r.player] || 0) + 1; });
@@ -2573,50 +2578,12 @@ const FLIP_BACK_STYLE = 'stats';   // 'stats' (all numbers) or 'card' (hockey-ca
 })();
 
 // ---------------- built-in highlight player (Ledus Veči / E5 games) ----------------
-// Plays the game's YouTube video, jumping from goal to goal (both teams, in order) behind a short card, so it
-// watches like one highlight video. Single ▶ video links on E5 pages open a short clip of that goal.
-// Speed tricks: the YouTube player code is loaded in the background before anyone clicks; the first goal is
-// buffered silently while the big ▶ is still showing; and a second hidden player buffers the NEXT goal while
-// the current one plays, so each jump is instant (no black screen, feels like a local video). The hidden player
-// warms up a few seconds before each clip, so the clip starts in full quality instead of blurry.
+// Plays the game's one YouTube video, jumping from goal to goal (both teams, in order) behind a short fade, so it
+// watches like one highlight video. Single ▶ video links on E5 pages open the same player at that goal.
 const HL = (function(){
-  const CLIP = 20, PRE = 3, CARD_MIN = 1100, REVEAL_MAX = 8000;
-  // WARM: the hidden player starts this many seconds BEFORE the clip and plays (muted, out of sight) up to the clip
-  // start. YouTube always starts a video in low quality and steps up after a few seconds - this way the step-up
-  // happens during the warm-up, and the clip itself is already buffered in full quality when it's shown.
-  const WARM = 8, MAX_CATCHUP = 3;
-  // CTRL_HIDE: while a video plays, the bottom bar (pause button, timeline) fades out this many ms after the last
-  // mouse move / tap; moving the mouse or tapping the video brings it back. While paused it always stays.
-  const CTRL_HIDE = 900;
+  const CLIP = 20, PRE = 3;
   const vidOf = u => (String(u || '').match(/(?:v=|youtu\.be\/|embed\/)([\w-]{11})/) || [])[1] || null;
   const secOf = u => { const m = String(u || '').match(/[?&]t=(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s?)?/); return m ? (+m[1] || 0) * 3600 + (+m[2] || 0) * 60 + (+m[3] || 0) : 0; };
-  const PV = { controls: 0, disablekb: 1, modestbranding: 1, rel: 0, playsinline: 1, iv_load_policy: 3, vq: 'hd1080' };
-
-  // ---- YouTube player code: loaded once, in the background ----
-  let apiState = 0; const apiWait = [];
-  function ensureApi(cb){
-    if (window.YT && YT.Player) { apiState = 2; if (cb) cb(); return; }
-    if (cb) apiWait.push(cb);
-    if (apiState) return; apiState = 1;
-    const prev = window.onYouTubeIframeAPIReady;
-    window.onYouTubeIframeAPIReady = () => { apiState = 2; if (prev) try { prev(); } catch (e) {} apiWait.splice(0).forEach(f => f()); };
-    ['https://www.youtube.com', 'https://i.ytimg.com', 'https://www.google.com'].forEach(h => { const l = document.createElement('link'); l.rel = 'preconnect'; l.href = h; document.head.appendChild(l); });
-    const s = document.createElement('script'); s.src = 'https://www.youtube.com/iframe_api'; document.head.appendChild(s);
-  }
-  const idle = window.requestIdleCallback || (f => setTimeout(f, 1500));
-  window.addEventListener('load', () => idle(() => ensureApi()));
-  // warm up as soon as someone points at / touches a Highlights button or a ▶ video link
-  ['pointerover', 'touchstart', 'focusin'].forEach(ev => document.addEventListener(ev, e => {
-    if (e.target.closest && e.target.closest('.pack-btn, .goal-video, a[href*="youtube.com/watch"], a[href*="youtu.be/"]')) ensureApi();
-  }, { passive: true }));
-  // highest quality: ask for it every time a player starts (YouTube may ignore it; the big player size does the rest)
-  const hiQ = p => { try { p.setPlaybackQuality('highres'); } catch (e) {} };
-  // small loading spinner on the black cover (only visible while a video is still loading)
-  (function(){ const st = document.createElement('style');
-    st.textContent = '.hlp-cover.loading::after{content:"";position:absolute;left:50%;top:50%;width:38px;height:38px;margin:-19px 0 0 -19px;border:3px solid rgba(255,255,255,.25);border-top-color:#fff;border-radius:50%;animation:hlpSpin .8s linear infinite}@keyframes hlpSpin{to{transform:rotate(360deg)}}@media (prefers-reduced-motion:reduce){.hlp-cover.loading::after{animation-duration:2.4s}}' +
-      '.hlp-ctrl{transition:opacity .15s}.hlp-player.ctrl-hide .hlp-ctrl{opacity:0;pointer-events:none}.hlp-player.ctrl-hide{cursor:none}.hlp-big{transition:opacity .1s !important}';
-    document.head.appendChild(st); })();
-
   // all goals of one game that have a video time, in the order they happened
   function goalsOf(b){
     const out = [], us = b.lvIsHome ? b.htGoalLog : b.atGoalLog, them = b.lvIsHome ? b.atGoalLog : b.htGoalLog;
@@ -2630,20 +2597,12 @@ const HL = (function(){
     for (const b of DATA.boxscores) { const gl = goalsOf(b), k = gl.findIndex(g => g.id === id && Math.abs(g.t - t) <= 2); if (k >= 0) return { b, k }; }
     return null;
   }
-
-  // ---- two players: one plays, the other quietly buffers the next goal ----
-  let ov, P = [], cur = 0, ready = 0, G = null, list = [], i = -1, playing = false, segEnd = 0, single = false;
-  let goAt = 0, ctrlT = 0, reveal = null; // pending "remove the card once the video really plays"
+  let ov, ytp = null, ytReady = false, G = null, list = [], i = -1, playing = false, segEnd = 0, single = false, loadingApi = false;
   const $ = s => ov.querySelector(s);
-  const startOf = g => Math.max(0, g.t - PRE);
-  const pl = n => P[n] && P[n].p;
-  // bottom bar: show now, hide again shortly if a video is playing
-  function poke(){ const box = $('.hlp-player'); box.classList.remove('ctrl-hide'); clearTimeout(ctrlT);
-    if (playing) ctrlT = setTimeout(() => { if (playing) box.classList.add('ctrl-hide'); }, CTRL_HIDE); }
   function build(){
     ov = document.createElement('div'); ov.className = 'hlp-ov';
     ov.innerHTML = `<div class="hlp"><button class="hlp-close" title="Aizvērt">✕</button>
-      <div class="hlp-player"><div class="hlp-yt" id="hlpYT"></div><div class="hlp-yt" id="hlpYT2"></div>
+      <div class="hlp-player"><div class="hlp-yt" id="hlpYT"></div>
         <div class="hlp-lower"><div class="scb"></div><div class="who"><b></b><small></small></div></div>
         <div class="hlp-card"><div><img alt=""><div class="sc"></div><div class="nm"></div><div class="as"></div></div></div>
         <div class="hlp-fade"></div><div class="hlp-cover on"></div><div class="hlp-big"><span></span></div>
@@ -2652,106 +2611,44 @@ const HL = (function(){
     document.body.appendChild(ov);
     $('.hlp-close').onclick = close; ov.addEventListener('click', e => { if (e.target === ov) close(); });
     $('.hlp-big').onclick = play; $('.hlp-pp').onclick = () => playing ? pause() : play();
-    ['mousemove', 'touchstart', 'click'].forEach(ev => $('.hlp-player').addEventListener(ev, poke, { passive: true }));
-    $('.hlp-tl').addEventListener('click', e => { const d = e.target.closest('.dot'); if (d) { single = false; $('.hlp-big').classList.add('hide'); $('.hlp-cover').classList.remove('on'); playing = true; poke(); go(+d.dataset.k); } });
+    $('.hlp-tl').addEventListener('click', e => { const d = e.target.closest('.dot'); if (d) { single = false; $('.hlp-big').classList.add('hide'); $('.hlp-cover').classList.remove('on'); playing = true; go(+d.dataset.k); } });
     document.addEventListener('keydown', e => { if (!ov.classList.contains('on')) return;
       if (e.key === 'Escape') close(); if (e.key === ' ') { e.preventDefault(); playing ? pause() : play(); }
       if (e.key === 'ArrowRight' && i >= 0 && i < list.length - 1) go(i + 1); if (e.key === 'ArrowLeft' && i > 0) go(i - 1); });
-    setInterval(() => {
-      // warm-ups: stop each hidden player exactly at its clip start (everything from there on is buffered in HD)
-      P.forEach((s, j) => { if (!s.prepping || !s.rolling || (j === cur && playing)) return;
-        const t = s.p.getCurrentTime ? s.p.getCurrentTime() : 0;
-        if (t >= s.want.t - 0.15) { s.p.pauseVideo(); s.prepping = false; s.rolling = false; s.ok = true; } });
-      const p = pl(cur); if (ready !== 2 || i < 0 || !p || !p.getCurrentTime) return;
-      const t = p.getCurrentTime(), since = Date.now() - goAt;
-      // video is really running inside this goal's clip -> take the card down (covers seeks that fire no event)
-      if (reveal && playing && since > 400 && p.getPlayerState() === 1 && t >= segEnd - CLIP - 0.5 && t < segEnd) reveal();
-      // clip finished -> next goal (ignore the first moments after a jump, while the old time may still show)
-      if (playing && since > 1500 && t >= segEnd) single ? finish() : go(i + 1); }, 250);
+    setInterval(() => { if (ytReady && playing && i >= 0 && ytp.getCurrentTime && ytp.getCurrentTime() >= segEnd) single ? finish() : go(i + 1); }, 250);
   }
-  // both players stay "visible" and full size (the waiting one just sits underneath), because YouTube lowers the
-  // quality of players it thinks are hidden or small
-  function show(n){ P.forEach((x, j) => { const f = x.p.getIframe && x.p.getIframe(); if (f) { f.style.visibility = 'visible'; f.style.zIndex = j === n ? '1' : '0'; } }); }
-  function makePlayers(cb){
-    if (ready === 2) return cb(); if (ready === 1) { P.cb = cb; return; } ready = 1; P.cb = cb;
-    ensureApi(() => { let n = 0;
-      ['hlpYT', 'hlpYT2'].forEach((el, j) => { const slot = { p: null, want: null, ok: false, prepping: false, rolling: false };
-        slot.p = new YT.Player(el, { playerVars: PV, events: {
-          onReady: () => { slot.p.mute(); if (++n === 2) { ready = 2; show(cur); const f = P.cb; P.cb = null; f && f(); } },
-          onStateChange: e => onState(j, e.data) } });
-        P[j] = slot; });
-    });
-  }
-  // silently buffer goal g in player n: start WARM seconds early, muted and underneath, and let it play up to the
-  // clip start (YouTube climbs to full quality meanwhile); the interval above pauses it right at the clip start
-  function prep(n, g){
-    const s = P[n]; if (!s || !g) return; const st = startOf(g);
-    if (s.want && s.want.id === g.id && s.want.t === st && (s.ok || s.prepping)) return;
-    s.want = { id: g.id, t: st }; s.ok = false; s.prepping = true; s.rolling = false;
-    try { s.p.mute(); s.p.loadVideoById({ videoId: g.id, startSeconds: Math.max(0, st - WARM) }); hiQ(s.p); } catch (e) { s.prepping = false; }
-  }
-  function onState(n, state){
-    const s = P[n]; if (!s) return;
-    if (s.prepping && state === 1 && !(n === cur && playing)) { s.rolling = true; hiQ(s.p); return; }   // warm-up running
-    if (n === cur && state === 1 && playing) { hiQ(s.p); $('.hlp-cover').classList.remove('loading');
-      if (reveal && s.p.getCurrentTime() >= segEnd - CLIP - 0.5) reveal(); }   // only once it's inside the clip
+  function api(cb){
+    if (ytReady) return cb();
+    if (window.YT && YT.Player) { ytp = new YT.Player('hlpYT', { playerVars: { controls: 0, disablekb: 1, modestbranding: 1, rel: 0, playsinline: 1, iv_load_policy: 3 }, events: { onReady: () => { ytReady = true; cb(); } } }); return; }
+    const prevReady = window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady = () => { if (prevReady) prevReady(); ytp = new YT.Player('hlpYT', { playerVars: { controls: 0, disablekb: 1, modestbranding: 1, rel: 0, playsinline: 1, iv_load_policy: 3 },
+      events: { onReady: () => { ytReady = true; cb(); } } }); };
+    if (!loadingApi) { loadingApi = true; const s = document.createElement('script'); s.src = 'https://www.youtube.com/iframe_api'; document.head.appendChild(s); }
   }
   const logoFor = g => g.side === 'us' ? teamLogo('Ledus Veči') : teamLogo(g.team);
   function scoreAt(k){ let u = 0, t = 0; for (let j = 0; j <= k; j++) list[j].side === 'us' ? u++ : t++; return G.lvIsHome ? `${u}:${t}` : `${t}:${u}`; }
-  // start goal g on player n (instant if it was buffered there)
-  // the sound comes on when the goal card goes away, so the jump is clean
-  function startOn(n, g){
-    const s = P[n], st = startOf(g), mine = s.want && s.want.id === g.id && s.want.t === st;
-    const t = s.p.getCurrentTime ? s.p.getCurrentTime() : 0;
-    if (mine && s.ok) { if (Math.abs(t - st) > 1) s.p.seekTo(st, true); }               // warmed up: play right on, no seek
-    else if (mine && s.prepping && t < st && st - t <= MAX_CATCHUP) { /* still warming: let it roll into the clip under the card */ }
-    else if (s.p.getVideoData && s.p.getVideoData().video_id === g.id) { s.p.seekTo(st, true); }
-    else { s.p.loadVideoById({ videoId: g.id, startSeconds: st }); }
-    s.want = { id: g.id, t: st }; s.ok = false; s.prepping = false; s.rolling = false;
-    s.p.mute(); s.p.playVideo(); hiQ(s.p);
-  }
   function go(k){
-    if (k >= list.length) { finish(); return; } i = k; goAt = Date.now(); const g = list[k];
+    if (k >= list.length) { finish(); return; } i = k; const g = list[k];
     $('.hlp-fade').classList.add('on'); $('.hlp-lower').classList.remove('on');
     $('.hlp-card img').src = logoFor(g); $('.hlp-card img').style.display = '';
     $('.hlp-card .sc').textContent = scoreAt(k); $('.hlp-card .nm').textContent = g.scorer;
     $('.hlp-card .as').textContent = g.a.length ? 'Piespēles: ' + g.a.join(', ') : ''; $('.hlp-card').classList.add('on');
-    segEnd = startOf(g) + CLIP;
-    $('.hlp-tl .fill').style.width = ((k + 1) / list.length * 100) + '%'; $('.hlp-ctrl .cnt').textContent = `${k + 1} / ${list.length}`;
-    const shownAt = Date.now();
-    let done = false;
-    const doReveal = () => { if (done || i !== k) return; done = true; reveal = null;
-      try { if (playing) pl(cur).unMute(); } catch (e) {}
-      $('.hlp-card').classList.remove('on'); $('.hlp-fade').classList.remove('on');
+    segEnd = g.t - PRE + CLIP;
+    if (ytReady) { if (ytp.getVideoData && ytp.getVideoData().video_id === g.id) ytp.seekTo(Math.max(0, g.t - PRE), true); else ytp.loadVideoById({ videoId: g.id, startSeconds: Math.max(0, g.t - PRE) }); ytp.playVideo(); }
+    setTimeout(() => { $('.hlp-card').classList.remove('on'); $('.hlp-fade').classList.remove('on');
       $('.hlp-lower .scb').innerHTML = `<img src="${logoFor(g)}" alt="">${scoreAt(k)}`; $('.hlp-lower .who b').textContent = g.scorer;
-      $('.hlp-lower .who small').textContent = g.a.join(', '); $('.hlp-lower').className = 'hlp-lower on ' + g.side;
-      // now that this goal is playing, buffer the next one in the other player
-      setTimeout(() => { if (i === k && list[k + 1] && !single) prep(1 - cur, list[k + 1]); }, 1200); };
-    // the card stays up until the video is really playing (at least CARD_MIN so it can be read), never a black gap
-    reveal = () => { const wait = CARD_MIN - (Date.now() - shownAt); wait > 0 ? setTimeout(doReveal, wait) : doReveal(); };
-    setTimeout(() => { if (!done && i === k) doReveal(); }, REVEAL_MAX);
-    makePlayers(() => {
-      if (i !== k) return;
-      // use the hidden player if it already holds this goal; otherwise the current one
-      const o = 1 - cur, so = P[o], st = startOf(g);
-      if (so && so.want && so.want.id === g.id && so.want.t === st && (so.ok || so.prepping)) {
-        try { pl(cur).pauseVideo(); } catch (e) {} cur = o; show(cur);
-      }
-      startOn(cur, g);
-    });
+      $('.hlp-lower .who small').textContent = g.a.join(', '); $('.hlp-lower').className = 'hlp-lower on ' + g.side; }, 1100);
+    $('.hlp-tl .fill').style.width = ((k + 1) / list.length * 100) + '%'; $('.hlp-ctrl .cnt').textContent = `${k + 1} / ${list.length}`;
   }
-  function finish(){ if (single) { close(); return; }   // one goal only: close when it's done
-    playing = false; poke(); reveal = null; P.forEach(s => { try { s.p.pauseVideo(); } catch (e) {} }); $('.hlp-lower').classList.remove('on');
+  function finish(){ playing = false; if (ytReady) ytp.pauseVideo(); $('.hlp-lower').classList.remove('on');
+    const us = G.lvIsHome ? G.htGoals : G.atGoals, th = G.lvIsHome ? G.atGoals : G.htGoals;
     $('.hlp-card img').style.display = 'none'; $('.hlp-card .sc').textContent = `${G.htGoals}:${G.atGoals}`;
     $('.hlp-card .nm').textContent = single ? 'Vārtu klips beidzās' : 'Spēles beigas'; $('.hlp-card .as').textContent = `${G.homeTeam} – ${G.awayTeam}`;
     $('.hlp-card').classList.add('on'); $('.hlp-fade').classList.add('on'); $('.hlp-cover').classList.add('on'); $('.hlp-big').classList.remove('hide'); $('.hlp-pp').textContent = '▶';
-    i = -1; if (list[0]) makePlayers(() => prep(cur, list[0])); }
-  function play(){ $('.hlp-big').classList.add('hide'); $('.hlp-cover').classList.remove('on'); playing = true; $('.hlp-pp').textContent = '❚❚'; poke();
-    const p = pl(cur);
-    if (i < 0 || !p || !p.getPlayerState || p.getPlayerState() === 0 || $('.hlp-fade').classList.contains('on')) go(Math.max(0, i < 0 ? 0 : i + (single ? 1 : 0)));
-    else { if (!reveal) p.unMute(); p.playVideo(); } }
-  function pause(){ playing = false; poke(); $('.hlp-pp').textContent = '▶'; const p = pl(cur); if (p && p.pauseVideo) p.pauseVideo(); $('.hlp-cover').classList.add('on'); $('.hlp-big').classList.remove('hide'); }
-  function close(){ pause(); reveal = null; P.forEach(s => { try { s.p.stopVideo(); } catch (e) {} s.want = null; s.ok = false; s.prepping = false; s.rolling = false; }); ov.classList.remove('on'); }
+    i = -1; }
+  function play(){ $('.hlp-big').classList.add('hide'); $('.hlp-cover').classList.remove('on'); playing = true; $('.hlp-pp').textContent = '❚❚'; api(() => { if (i < 0 || !ytp.getPlayerState || ytp.getPlayerState() === 0 || $('.hlp-fade').classList.contains('on')) go(Math.max(0, i < 0 ? 0 : i + (single ? 1 : 0))); else ytp.playVideo(); }); }
+  function pause(){ playing = false; $('.hlp-pp').textContent = '▶'; if (ytReady) ytp.pauseVideo(); $('.hlp-cover').classList.add('on'); $('.hlp-big').classList.remove('hide'); }
+  function close(){ pause(); ov.classList.remove('on'); }
   function open(b, k, onlyOne){
     if (!ov) build(); G = b; list = goalsOf(b); if (!list.length) return;
     single = !!onlyOne; i = single ? k - 1 : -1; playing = false;
@@ -2759,19 +2656,15 @@ const HL = (function(){
     list.forEach((g, j) => { const d = document.createElement('span'); d.className = 'dot ' + g.side; d.style.left = ((j + .5) / list.length * 100) + '%'; d.title = g.scorer; d.dataset.k = j; $('.hlp-tl').appendChild(d); });
     $('.hlp-tl .fill').style.width = '0'; $('.hlp-ctrl .cnt').textContent = `0 / ${list.length}`;
     $('.hlp-card').classList.remove('on'); $('.hlp-lower').classList.remove('on'); $('.hlp-fade').classList.remove('on'); $('.hlp-cover').classList.add('on'); $('.hlp-big').classList.remove('hide'); $('.hlp-pp').textContent = '▶';
-    ov.classList.add('on');
-    // buffer the first goal (and the one after it) while the big ▶ is still showing
-    const first = list[Math.max(0, single ? k : 0)];
-    makePlayers(() => { if (ov.classList.contains('on') && !playing) { prep(cur, first); const nx = list[(single ? k : 0) + 1]; if (nx && !single) setTimeout(() => prep(1 - cur, nx), 1500); } });
+    ov.classList.add('on'); api(() => {});
     if (single) play();
   }
-
   // a single goal: just the video (20 s from 3 s before the goal), no cards or bars, no YouTube buttons;
   // it starts straight away, and when the clip ends a black cover with "↻" hides YouTube's end screen
-  let clipOv, clipP = null, clipArgs = null, clipMaking = false;
+  let clipOv, clipP = null, clipArgs = null, clipApiWait = false;
   function clipShut(){ if (!clipOv) return; clipOv.classList.remove('on'); try { clipP && clipP.stopVideo(); } catch (e) {} }
-  function clipStart(){ const [id, t] = clipArgs; const c = clipOv.querySelector('.hlp-cover'); c.classList.add('on', 'loading'); clipOv.querySelector('.clip-again').style.display = 'none';
-    clipP.loadVideoById({ videoId: id, startSeconds: t, endSeconds: t + CLIP }); hiQ(clipP); }
+  function clipStart(){ const [id, t] = clipArgs; clipOv.querySelector('.hlp-cover').classList.remove('on'); clipOv.querySelector('.clip-again').style.display = 'none';
+    clipP.loadVideoById({ videoId: id, startSeconds: t, endSeconds: t + CLIP }); }
   function clip(url){
     const id = vidOf(url), t = Math.max(0, secOf(url) - PRE); if (!id) return;
     if (!clipOv) { clipOv = document.createElement('div'); clipOv.className = 'hlp-ov clip-ov';
@@ -2780,17 +2673,16 @@ const HL = (function(){
       clipOv.querySelector('.hlp-close').onclick = clipShut; clipOv.addEventListener('click', e => { if (e.target === clipOv) clipShut(); });
       clipOv.querySelector('.clip-again').onclick = () => clipStart();
       document.addEventListener('keydown', e => { if (e.key === 'Escape' && clipOv.classList.contains('on')) clipShut(); }); }
-    clipArgs = [id, t]; clipOv.classList.add('on'); clipOv.querySelector('.hlp-cover').classList.add('on', 'loading');
-    const make = () => { if (clipP) return clipStart(); if (clipMaking) return; clipMaking = true;
-      clipP = new YT.Player('clipYT', { playerVars: Object.assign({}, PV, { fs: 0 }),
+    clipArgs = [id, t]; clipOv.classList.add('on'); clipOv.querySelector('.hlp-cover').classList.add('on');
+    const make = () => { if (clipP) return clipStart();
+      clipP = new YT.Player('clipYT', { playerVars: { controls: 0, disablekb: 1, modestbranding: 1, rel: 0, playsinline: 1, iv_load_policy: 3, fs: 0 },
         events: { onReady: () => clipStart(),
           onStateChange: e => { const c = clipOv.querySelector('.hlp-cover');
-            if (e.data === 1) { c.classList.remove('on', 'loading'); hiQ(clipP); }      // playing
-            // clip finished -> close the player (a pause before the end keeps the ↻ button as before)
-            const end = clipArgs[1] + CLIP, tNow = clipP.getCurrentTime ? clipP.getCurrentTime() : 0;
-            if (e.data === 0 || (e.data === 2 && tNow >= end - 0.5)) { clipShut(); return; }
-            if (e.data === 2) { c.classList.add('on'); c.classList.remove('loading'); clipOv.querySelector('.clip-again').style.display = ''; } } } }); };
-    ensureApi(make);
+            if (e.data === 1) c.classList.remove('on');                                  // playing
+            if (e.data === 0 || e.data === 2) { c.classList.add('on'); clipOv.querySelector('.clip-again').style.display = ''; } } } }); };
+    if (window.YT && YT.Player) make();
+    else { const prev = window.onYouTubeIframeAPIReady; window.onYouTubeIframeAPIReady = () => { if (prev) prev(); make(); };
+      if (!loadingApi && !clipApiWait) { clipApiWait = true; loadingApi = true; const s = document.createElement('script'); s.src = 'https://www.youtube.com/iframe_api'; document.head.appendChild(s); } }
   }
   // E5 ▶ video links open here instead of on YouTube
   document.addEventListener('click', e => {
