@@ -532,7 +532,11 @@ function parseTeamView(html) {
       const abbrs = [...row.matchAll(/<span class="team_name">([A-Z0-9]{2,3})<\/span>/g)].map(x => x[1]);
       if (abbrs.length !== 2) continue;
       const ids = [...new Set([...row.matchAll(/\/komandas\/[^"'\/]+\/(\d+)/g)].map(x => x[1]))];
-      const score = row.match(/<span class="score">(\d+):(\d+)<\/span>/);
+      // the score cell: "5:2", but games decided in overtime / shootout are marked up differently (e.g. "5:4 (ot)"),
+      // so read the first "number:number" anywhere in the score cell
+      const cell = (row.match(/<td class="score-td[^"]*">([\s\S]*?)<\/td>/) || [])[1] || '';
+      const score = cell.replace(/<[^>]+>/g, ' ').match(/(\d+)\s*:\s*(\d+)/);
+      const extra = cell.replace(/<[^>]+>/g, ' ').toLowerCase();
       const prot = (row.match(/\/protokols\/(\d+)/) || [])[1] || null;
       const imgs = [...row.matchAll(/team_(\d+)\.png/g)].map(x => x[1]);
       const titles = [...row.matchAll(/<a href="\/komandas\/[^"]+"[^>]*title="([^"]+)"/g)].map(x => x[1].replace(/&amp;/g, '&'));
@@ -543,6 +547,7 @@ function parseTeamView(html) {
         home: { abbr: abbrs[0], id: ids.length === 2 ? ids[0] : null, img: imgs.length === 2 ? imgs[0] : null, name: titles.length === 2 ? titles[0] : null },
         away: { abbr: abbrs[1], id: ids.length === 2 ? ids[1] : null, img: imgs.length === 2 ? imgs[1] : null, name: titles.length === 2 ? titles[1] : null },
         played: !!score, hg: score ? +score[1] : null, ag: score ? +score[2] : null,
+        decided: /\b(so|bullīt|shoot)/.test(extra) ? 'SO' : /\b(ot|papild)/.test(extra) ? 'OT' : '',
         protocol: prot ? `${EHL}/protokols/${prot}` : null,
       });
     }
