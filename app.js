@@ -1815,7 +1815,8 @@ renderStatsTab();
   function ehlPersp(g, abbr, names){
     const home = g.home.abbr === abbr, us = home ? g.home : g.away, them = home ? g.away : g.home;
     return { date: g.date, home, opp: names[them.abbr] || them.abbr, oppAbbr: them.abbr,
-      us: home ? g.hg : g.ag, them: home ? g.ag : g.hg, result: g.played ? res(home ? g.hg : g.ag, home ? g.ag : g.hg) : null, link: g.protocol };
+      us: home ? g.hg : g.ag, them: home ? g.ag : g.hg, result: g.played ? res(home ? g.hg : g.ag, home ? g.ag : g.hg) : null, link: g.protocol,
+      decided: g.decided || (((DATA.clubGames || {})[g.division] || []).find(x => x.protocol === g.protocol) || {}).decided || '' };
   }
 
   // ---- build the same shape for every team ----
@@ -1892,8 +1893,8 @@ renderStatsTab();
   // hover text for a W / L / D box: "vs Huligan 1-2 · 30. sept."
   const LVM = ['janv.','febr.','marts','apr.','maijs','jūn.','jūl.','aug.','sept.','okt.','nov.','dec.'];
   const tip = p => { const [, m, d] = String(p.date || '').split('-').map(Number);
-    return esc(`${p.home ? 'vs' : '@'} ${p.opp} ${p.us}-${p.them}${d ? ` · ${d}. ${LVM[m - 1]}` : ''}`); };
-  const form = (list, away) => `<div class="match-form">${away ? '' : '<span class="lbl5" style="margin-left:0">Last 5</span>'}${list.slice(-5).map(p => `<span class="f ${p.result}" data-tip="${tip(p)}">${p.result}</span>`).join('')}${away ? '<span class="lbl5" style="margin-right:0">Last 5</span>' : ''}</div>`;
+    return esc(`${p.home ? 'vs' : '@'} ${p.opp} ${p.us}-${p.them}${p.decided ? ' ' + p.decided : ''}${d ? ` · ${d}. ${LVM[m - 1]}` : ''}`); };
+  const form = (list, away) => `<div class="match-form">${away ? '' : '<span class="lbl5" style="margin-left:0">Last 5</span>'}${list.slice(-5).map(p => `<span class="f ${p.result}${p.decided ? ' xt' : ''}" data-tip="${tip(p)}">${p.result}${p.decided ? `<i>${p.decided}</i>` : ''}</span>`).join('')}${away ? '<span class="lbl5" style="margin-right:0">Last 5</span>' : ''}</div>`;
   const boxLink = (link, label) => !link ? '' : link.startsWith('#box:')
     ? `<a href="#stats" data-boxdate="${link.slice(5)}">${label}</a>` : `<a href="${link}" target="_blank" rel="noopener">${label}</a>`;
   const resRow = (logo, name, p) => !p ? '' : `<div class="res-row">${logoHtml(logo, name, 30)}<div style="min-width:0">
