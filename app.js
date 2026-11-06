@@ -260,6 +260,7 @@ let statsSortState = {key:'date', dir:-1};
 const SKATER_COLS = [
   {key:'date', label:'Datums', left:true},
   {key:'opponent', label:'Pretinieks', left:true},
+  {key:'lineSlot', label:'Pozīcija'},
   {key:'g', label:'G'}, {key:'a', label:'A'},
   {key:'shAtt', label:'Shots'}, {key:'sh', label:'SOG'}, {key:'shPct', label:'Shot%'},
   {key:'bl', label:'BLK'}, {key:'pim', label:'PIM'}, {key:'pimA', label:'PIM/A'},
@@ -273,6 +274,9 @@ const GOALIE_COLS = [
   {key:'ga', label:'GA'}, {key:'savePct', label:'SV%'},
 ];
 
+// position in that game: "1 LW" -> "LW"
+function slotCell(s){ s = String(s || '').trim(); if (!s) return '<span style="color:var(--text-faint)">—</span>';
+  const m = s.match(/^([123])\s*(LW|C|RW|LD|RD)$/i); return m ? `<b>${m[2].toUpperCase()}</b>` : `<b>${s.replace(/[&<>"]/g, '')}</b>`; }
 function fmtPctVal(v){ return (v===null||v===undefined) ? '—' : Math.round(v*1000)/10+'%'; }
 function fmtPM2(v){ return (v===null||v===undefined) ? '—' : ((v>0?'+':'')+v); }
 function fmtNum(v){ return (v===null||v===undefined) ? '—' : v; }
@@ -946,13 +950,14 @@ function renderStatsTab(){
       return `<tr class="expandable" data-date="${r.date}">
         <td style="text-align:left"><span class="chevron">▶</span>${r.date}</td>
         <td style="text-align:left">${oppCell(r)}</td>
+        <td>${slotCell(r.lineSlot || r.pos)}</td>
         <td>${r.g}</td><td>${r.a}</td>
         <td>${fmtNum(r.shAtt)}</td><td>${fmtNum(r.sh)}</td><td>${fmtPctVal(r.shPct)}</td>
         <td>${fmtNum(r.bl)}</td><td>${fmtNum(r.pim)}</td><td>${fmtNum(r.pimA)}</td>
         <td>${fmtPM2(r.pm)}</td><td>${fmtPM2(r.pmAdj)}</td>
         <td>${foRatio}</td><td>${fmtPctVal(r.foPct)}</td>
       </tr>`;
-    }).join('') || `<tr><td colspan="14" style="color:var(--text-dim);text-align:center;padding:20px;">No games in this range</td></tr>`;
+    }).join('') || `<tr><td colspan="15" style="color:var(--text-dim);text-align:center;padding:20px;">No games in this range</td></tr>`;
     wireStatsExpandableRows(14, player, false);
   }
 }
@@ -2376,15 +2381,20 @@ document.getElementById('statsTeamSelect') && document.getElementById('statsTeam
         const G = cnt(g, x => x.scorer === name), A = cnt(g, x => x.a1 === name || x.a2 === name);
         const PIMg = g.pr.penalties.filter(x => x.side === 'us' && x.player === name).reduce((s, x) => s + x.min, 0);
         const PPg = cnt(g, x => x.pp && x.scorer === name);
+        const slot = (() => { const L = ((DATA.clubLineups || {})[div] || {})[g.date]; if (!L) return '';
+          const me = (g.pr.players || []).find(x => x.name === name) || {}, norm = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+          const sur = norm(name).split(/\s+/).pop();
+          const hit = Object.entries(L).find(([k, v]) => { v = String(v).trim(); return (me.nr != null && v.replace('#', '') === String(me.nr)) || norm(v) === norm(name) || norm(v).split(/\s+/).pop() === sur; });
+          return hit ? hit[0] : ''; })();
         return `<tr><td>${g.date}${hasVideo(g.pr) ? '<span class="hl-mark" title="highlight">▶</span>' : ''}</td><td>${g.home ? 'vs' : '@'} ${logoImg(g.logo, g.opp)}${esc(g.opp)}</td>
-          <td>${G}</td><td>${A}</td><td><b>${G + A}</b></td><td>${PPg}</td><td>${PIMg}</td></tr>`; }).join('');
+          <td>${slotCell(slot)}</td><td>${G}</td><td>${A}</td><td><b>${G + A}</b></td><td>${PPg}</td><td>${PIMg}</td></tr>`; }).join('');
       return `<div class="panel player-card"><div class="card-top-row">${imgOrPh(photoOf(p), 'card-photo')}
           <div class="card-body"><div class="card-name">${esc(p.name)}</div>
             <div class="card-meta">${p.pos ? `<span class="badge ${POSL[p.pos]}">${POSL[p.pos]}</span>` : ''}${p.nr != null ? `<span>#${p.nr}</span>` : ''}${meta ? `<span>${meta}</span>` : ''}</div>
             ${p.ehl ? `<a class="card-ehl" href="${p.ehl}" target="_blank" rel="noopener">EHL profils →</a>` : ''}
             <div class="card-stats"><div class="card-stat-row">${row1.map(tile).join('')}</div><div class="card-stat-row">${row2.map(tile).join('')}</div></div></div></div></div>
-        <div class="panel"><div class="table-scroll"><table class="cl-gl" style="width:100%;border-collapse:collapse"><thead><tr><th>Datums</th><th>Pretinieks</th><th>G</th><th>A</th><th>P</th><th>PPG</th><th>PIM</th></tr></thead>
-          <tbody>${rows || '<tr><td colspan="7" class="empty-note" style="text-align:center">Nav spēļu</td></tr>'}</tbody></table></div></div>`;
+        <div class="panel"><div class="table-scroll"><table class="cl-gl" style="width:100%;border-collapse:collapse"><thead><tr><th>Datums</th><th>Pretinieks</th><th>Pozīcija</th><th>G</th><th>A</th><th>P</th><th>PPG</th><th>PIM</th></tr></thead>
+          <tbody>${rows || '<tr><td colspan="8" class="empty-note" style="text-align:center">Nav spēļu</td></tr>'}</tbody></table></div></div>`;
     };
     const sortedPl = players.slice().sort((x, y) => x.name.localeCompare(y.name));
     const firstPl = skaters[0] ? skaters[0].name : (players[0] && players[0].name);

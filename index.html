@@ -1227,12 +1227,12 @@ footer{text-align:center;color:var(--text-faint);font-size:12px;padding:20px;}
   /* II / III game list the same way */
   .club-view .cl-gl thead{display:none;}
   .club-view .cl-gl,.club-view .cl-gl tbody{display:block;width:100%;}
-  .club-view .cl-gl tbody tr{display:grid;grid-template-columns:repeat(5,1fr);gap:6px 4px;padding:10px 4px;border-bottom:1px solid var(--line);}
+  .club-view .cl-gl tbody tr{display:grid;grid-template-columns:repeat(6,1fr);gap:6px 4px;padding:10px 4px;border-bottom:1px solid var(--line);}
   .club-view .cl-gl tbody td{display:flex;flex-direction:column-reverse;align-items:center;border:none !important;padding:2px !important;font-weight:600;}
   .club-view .cl-gl tbody td:nth-child(1){grid-column:1 / 3;align-items:flex-start;font-size:13px;color:var(--text-dim);}
-  .club-view .cl-gl tbody td:nth-child(2){grid-column:3 / 6;align-items:flex-end;}
-  .club-view .cl-gl tbody td:nth-child(3)::after{content:'G'} .club-view .cl-gl tbody td:nth-child(4)::after{content:'A'}
-  .club-view .cl-gl tbody td:nth-child(5)::after{content:'P'} .club-view .cl-gl tbody td:nth-child(6)::after{content:'PPG'} .club-view .cl-gl tbody td:nth-child(7)::after{content:'PIM'}
+  .club-view .cl-gl tbody td:nth-child(2){grid-column:3 / 7;align-items:flex-end;}
+  .club-view .cl-gl tbody td:nth-child(3)::after{content:'POZ.'} .club-view .cl-gl tbody td:nth-child(4)::after{content:'G'} .club-view .cl-gl tbody td:nth-child(5)::after{content:'A'}
+  .club-view .cl-gl tbody td:nth-child(6)::after{content:'P'} .club-view .cl-gl tbody td:nth-child(7)::after{content:'PPG'} .club-view .cl-gl tbody td:nth-child(8)::after{content:'PIM'}
   .club-view .cl-gl tbody td::after{font-size:10px;font-weight:500;color:var(--text-dim);}
 }
 
@@ -1356,7 +1356,7 @@ footer{text-align:center;color:var(--text-faint);font-size:12px;padding:20px;}
 
 /* ---- phone: Ledus Veči II / III games as flip cards too ---- */
 @media (max-width:700px){
-  .club-view .cl-gl tbody tr{cursor:pointer;position:relative;grid-template-columns:repeat(5,1fr);}
+  .club-view .cl-gl tbody tr{cursor:pointer;position:relative;grid-template-columns:repeat(6,1fr);}
   .club-view .cl-gl tbody tr:not(.flipped) td:nth-child(n+3){display:none !important;}
   .club-view .cl-gl tbody tr:not(.flipped){padding:12px 4px;}
   .club-view .cl-gl tbody tr.flipped{background:rgba(131,12,103,.08);border-radius:8px;}
