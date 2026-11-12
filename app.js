@@ -1865,8 +1865,10 @@ renderStatsTab();
       if (t.div === 'E5') ev = (window.calEventsOn ? window.calEventsOn(ds) : []).filter(e => e.type !== 'game' || e.div === 'E5');
       else {
         ev = (window.calEventsOn ? window.calEventsOn(ds) : []).filter(e => e.type === 'practice');
-        (t.ehlUpcoming || []).filter(g => g.date === ds).forEach(g => { const p = ehlPersp(g, CLUB[t.div].abbr, CLUB[t.div].names || {});
-          ev.unshift({ type: 'game', text: [`${p.home ? 'vs' : 'at'} ${p.opp}`, g.time, g.arena ? tc(g.arena) : ''].filter(Boolean).join(' · ') }); });
+        // every game of this team on that day: upcoming ones with time and rink, played ones with the score and result
+        ((CLUB[t.div] && CLUB[t.div].games) || []).filter(g => g.date === ds).forEach(g => { const p = ehlPersp(g, CLUB[t.div].abbr, CLUB[t.div].names || {});
+          ev.unshift({ type: 'game', text: g.played ? `${p.home ? 'vs' : 'at'} ${p.opp} · ${p.us}-${p.them} ${p.result}${p.decided ? ' ' + p.decided : ''}`
+            : [`${p.home ? 'vs' : 'at'} ${p.opp}`, g.time, g.arena ? tc(g.arena) : ''].filter(Boolean).join(' · ') }); });
         people.forEach(p => {
           if (p.birthday && p.birthday.slice(5) === md) ev.push({ type: 'bday', text: `Birthday: ${p.name}` });
           if (p.nameDay && p.nameDay.d === md) ev.push({ type: 'nday', text: `Name day: ${p.name}${p.nameDay.special ? ' (day of uncommon names)' : ''}` });
