@@ -2700,7 +2700,7 @@ window.__HL = HL;
 // ---------------- Barrel nūjas (stick order) ----------------
 // Each player builds their own order (sticks with their own specs, RocketGrip grips, socks) and sends it; the order
 // lands as rows in the "Nūju pasūtījumi" spreadsheet through its Apps Script web app (paste its /exec link below).
-const STICK_ORDER_URL = '';
+const STICK_ORDER_URL = 'https://script.google.com/macros/s/AKfycby_GWIqnAZjlCDbpAkSxSoxxaVtI2xtl4Wxuj4BFHM2uTWflQhwX0x_mC9TeX8UDzSA/exec';
 function stickRoster(){
   const out = [], seen = new Set(), sheetIds = new Set((DATA.roster || []).map(p => personId(p.ehl)).filter(Boolean));
   (DATA.roster || []).forEach(p => { if (seen.has(p.name)) return; seen.add(p.name); out.push({ name: p.name, nr: p.nr }); });
