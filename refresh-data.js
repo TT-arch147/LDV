@@ -35,102 +35,6 @@ const TEAM_ABBR = { SP2:'Sparta II', MT2:'Moltto Plus', WRS:'Warriors', ZLG:'Zem
   PTR:'Patrioti', NMJ:'Namejs', MTH:'Iecava/Mammoths', MZO:'Mežoņi', JUR:'Jūrmala',
   HLG:'Huligan', PL2:'Leģendas V' };
 
-const TEAM_IDS = { LDV: '293' };   // LDV's team id, from /komandas/ledus-veci/293
-
-// the team-filtered calendar view (main_calendar.team_review) lists BOTH recent results
-// and upcoming fixtures for one team; it's reached by POSTing the team's id to the same
-// /kalendars URL the dropdown itself submits to.
-function parseTeamCalendar(html, teamAbbr) {
-  const dayRe = /<li><div class="day"><span>([^<]+)<\/span><h2>([^<]+)<\/h2><\/div>([\s\S]*?)<\/li>/g;
-  const games = [];
-  let d;
-  while ((d = dayRe.exec(html))) {
-    const weekday = d[1], dateNum = d[2].replace(/&nbsp;/g, ' ').trim(), dayBlock = d[3];
-    const rowRe = /<tr class="div_e5">([\s\S]*?)<\/tr>/g;
-    let m;
-    while ((m = rowRe.exec(dayBlock))) {
-      const row = m[1];
-      const names = [...row.matchAll(/<span class="team_name">([A-Z0-9]{2,3})<\/span>/g)].map(x => x[1]);
-      if (names.length !== 2 || !names.includes(teamAbbr)) continue;
-      const isHome = names[0] === teamAbbr;
-      const oppAbbr = isHome ? names[1] : names[0];
-      const scoreM = row.match(/<span class="score">(\d+):(\d+)<\/span>/);
-      const time = (row.match(/<td>(\d{1,2}:\d{2})<\/td>/) || [])[1] || null;
-      const arena = (row.match(/<div class="calendar_arena_block">([^<]+)<\/div>/) || [])[1] || null;
-      const game = { opponent: TEAM_ABBR[oppAbbr] || oppAbbr, isHome, time, arena, weekday, date: dateNum };
-      if (scoreM) { game.played = true; game.homeGoals = +scoreM[1]; game.awayGoals = +scoreM[2]; }
-      else game.played = false;
-      games.push(game);
-    }
-  }
-  return games;
-}
-
-async function fetchTeamCalendarPost(teamAbbr) {
-  const id = TEAM_IDS[teamAbbr];
-  if (!id) return null;
-  const body = new URLSearchParams({ team: id, search: 'search' });
-  const res = await fetch(CALENDAR_URL + '?_cb=' + Date.now(), { method: 'POST', body, headers: BROWSER_HEADERS });
-  if (!res.ok) throw new Error('HTTP ' + res.status);
-  const html = await res.text();
-  if (!html.includes('team_review')) throw new Error('response did not look like the team-filtered view (form field names may differ)');
-  return parseTeamCalendar(html, teamAbbr);
-}
-
-function findUpcomingGames(html, teamAbbr) {
-  // this ribbon is a flat list of <li class="date"> markers interleaved with game <li>s;
-  // a marker applies to every game after it until the next marker
-  const itemRe = /<li(?: class="date")?\s*>([\s\S]*?)<\/li>/g;
-  const games = [];
-  let curMonth = null, curDay = null, m;
-  while ((m = itemRe.exec(html))) {
-    const item = m[1];
-    const dateM = item.match(/<div class="month">([^<]+)<\/div><div class="day">([^<]+)<\/div>/);
-    if (dateM) { curMonth = dateM[1]; curDay = dateM[2]; continue; }
-    const teams = [...item.matchAll(/&nbsp;([A-Z0-9]{2,3})<\/div>/g)].map(x => x[1]);
-    if (!item.includes('has-results-2') || !teams.includes(teamAbbr)) continue;
-    const time = ((item.match(/<div class="time">([^<]+)<\/div>/) || [])[1] || '').replace(/&nbsp;/g, ' ');
-    const arena = (item.match(/<div class="location">([^<]+)<\/div>/) || [])[1] || null;
-    const isHome = teams[0] === teamAbbr;   // first team listed = home
-    const oppAbbr = isHome ? teams[1] : teams[0];
-    games.push({ time, arena, isHome, opponent: TEAM_ABBR[oppAbbr] || oppAbbr,
-                 date: curDay && curMonth ? `${curDay} ${curMonth}` : null });
-  }
-  return games;
-}
-
-async function fetchUpcomingGames(teamAbbr, previous) {
-  const now = new Date().toISOString();
-  // preferred: the team-filtered calendar (more games, further ahead) - untested against the
-  // live site, since this form-POST behaviour can only be confirmed by actually running it there
-  try {
-    const games = await fetchTeamCalendarPost(teamAbbr);
-    if (games) {
-      const upcoming = games.filter(g => !g.played);
-      if (upcoming.length) {
-        console.log(`calendar (team view): ${upcoming.length} upcoming game(s) - next is ${upcoming[0].isHome ? 'vs' : 'at'} ${upcoming[0].opponent}, ${upcoming[0].time}`);
-        return upcoming.map(g => ({ ...g, fetchedAt: now }));
-      }
-      console.log('calendar (team view): reachable but no unplayed games found - falling back');
-    }
-  } catch (err) {
-    console.error('calendar (team view) failed, falling back to the general calendar:', err.message);
-  }
-  // fallback: the general calendar's game ribbon (already proven to work, but a shorter window)
-  try {
-    const res = await fetch(CALENDAR_URL + '?_cb=' + Date.now(), { headers: BROWSER_HEADERS });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const html = await res.text();
-    const games = findUpcomingGames(html, teamAbbr);
-    if (!games.length) { console.log('calendar (fallback): no upcoming games found (off-season, or the ribbon window has none for this team)'); return previous || []; }
-    console.log(`calendar (fallback): ${games.length} upcoming game(s) - next is ${games[0].isHome ? 'vs' : 'at'} ${games[0].opponent}, ${games[0].time}`);
-    return games.map(g => ({ ...g, fetchedAt: now }));
-  } catch (err) {
-    console.error('calendar (fallback) failed too, keeping previous value:', err.message);
-    return previous || [];
-  }
-}
-
 // a plain script request can get a different response than a real browser does (some sites
 // vary what they serve based on this) - a realistic header makes the request look like one
 const BROWSER_HEADERS = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36',
@@ -261,63 +165,6 @@ async function fetchTeamStats(previous, divisionId = '400', label = 'E5') {
   }
 }
 
-// ---------- E7 / E9 team logos into the logos folder ----------
-// Reads the teams of a division from the league's "Statistika > Komandas" page and saves each team's logo
-// (largest size EHL has) as logos/<team-name>.png. Files that already exist are never touched, so a logo you
-// upload yourself always wins. The workflow commits the logos folder.
-async function downloadTeamLogos(divisionId, label) {
-  try {
-    const cookie = await divisionCookie(divisionId);
-    const html = await getHtml(`${EHL}/statistika/komandas?_cb=${Date.now()}`, { headers: { ...BROWSER_HEADERS, ...(cookie ? { Cookie: cookie } : {}) } });
-    const div = (html.match(/stat-div-(\d+)/) || [])[1];
-    if (div !== divisionId) throw new Error(`page shows division ${div}, not ${divisionId}`);
-    const teams = [...html.matchAll(/<a href="\/komandas\/[^"]+"><img src="\/uploads\/team\/px\d+\/team_(\d+)\.png[^"]*"[^>]*class="team-logo">([^<]+)<\/a>/g)]
-      .map(m => ({ img: m[1], name: niceName(m[2].trim()) }));
-    const fileSlug = n => plain(n).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-    let saved = 0;
-    for (const t of teams) {
-      if (/^ledus ve/i.test(plain(t.name))) continue;
-      const file = path.join(__dirname, 'logos', fileSlug(t.name) + '.png');
-      if (fs.existsSync(file)) continue;
-      for (const size of ['px150', 'px100', 'px50']) {
-        try {
-          const res = await fetch(`${EHL}/uploads/team/${size}/team_${t.img}.png`, { headers: BROWSER_HEADERS });
-          if (!res.ok) continue;
-          const buf = Buffer.from(await res.arrayBuffer());
-          if (buf.length < 200) continue;
-          fs.mkdirSync(path.dirname(file), { recursive: true });
-          fs.writeFileSync(file, buf); saved++;
-          break;
-        } catch (e) { /* try the next size */ }
-      }
-    }
-    console.log(`logos ${label}: ${teams.length} teams on the page, ${saved} new logo files saved`);
-  } catch (err) {
-    console.error(`logos ${label} failed:`, err.message);
-  }
-}
-
-// ---------- page samples for the next step (protocol reader + E7 table) ----------
-// Saves trimmed copies of one E7 and one E9 game protocol and of the E7 table page into the data file,
-// so their exact layout can be checked from the (public) repo before writing the readers for them.
-async function capturePageSamples(club) {
-  const slim = html => html.replace(/<head[\s\S]*?<\/head>/i, '').replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<style[\s\S]*?<\/style>/gi, '')
-    .replace(/<header[\s\S]*?<\/header>/i, '').replace(/<footer[\s\S]*?<\/footer>/i, '').replace(/\s+/g, ' ').slice(0, 60000);
-  const out = { capturedAt: new Date().toISOString() };
-  for (const div of ['E7', 'E9']) {
-    const g = ((club && club[div] && club[div].games) || []).filter(x => x.played && x.protocol).pop();
-    if (!g) continue;
-    try { out['protocol' + div] = { url: g.protocol, html: slim(await getHtml(g.protocol)) }; } catch (e) { out['protocol' + div] = { url: g.protocol, error: e.message }; }
-  }
-  try {
-    const cookie = await divisionCookie('402');
-    out.tableE7 = slim(await getHtml(`${EHL}/statistika/tabula?_cb=${Date.now()}`, { headers: { ...BROWSER_HEADERS, ...(cookie ? { Cookie: cookie } : {}) } }));
-  } catch (e) { out.tableE7 = 'error: ' + e.message; }
-  console.log('page samples saved:', Object.keys(out).join(', '));
-  return out;
-}
-
-// ---------- E7 table: the E7 standings page is a "cross table" (every team against every team) ----------
 function parseCrossTable(html, divisionId) {
   const k = html.indexOf(`standings-table division-${divisionId}`); if (k < 0) return null;
   const t = html.slice(k, html.indexOf('</table>', k));
@@ -783,8 +630,6 @@ async function fetchPracticeExtras(previous) {
   let leagueTable = STATIC.leagueTable, upcomingGames = STATIC.upcomingGames;
   try { leagueTable = await fetchLeagueTable(STATIC.leagueTable); }
   catch (err) { console.error('league table: unexpected error, keeping previous value:', err.message); }
-  try { upcomingGames = await fetchUpcomingGames('LDV', STATIC.upcomingGames); }
-  catch (err) { console.error('calendar: unexpected error, keeping previous value:', err.message); }
 
   const finalRoster = roster.length ? roster : STATIC.roster;
   let birthdays = STATIC.birthdays, nameDays = STATIC.nameDays, practiceExtras = STATIC.practiceExtras;
@@ -901,13 +746,12 @@ async function fetchPracticeExtras(previous) {
   } catch (err) { console.error('logo files:', err.message); }
   let clubLineups = STATIC.clubLineups;
   try { clubLineups = await fetchClubLineups(STATIC.clubLineups); } catch (err) { console.error('lineups II/III:', err.message); }
-  let pageSamples = STATIC.pageSamples;
-  try { pageSamples = await capturePageSamples(club); } catch (err) { console.error('page samples failed:', err.message); }
   const fullE5 = fromClub(club);
   if (fullE5) { upcomingGames = fullE5; console.log(`upcoming E5: ${fullE5.length} games from the team calendar`); }
 
+  delete STATIC.pageSamples;   // old debug copies of EHL pages, no longer kept
   const updated = { ...STATIC, boxscores, skaterRows, goalieRows, roster: finalRoster,
-                     leagueTable, leagueTables, leagueStats, clubTeamStats, clubGames, clubPlayers, clubLineups, logoFiles, club, pageSamples, runLog: RUN_LOG.slice(-400), teamRosters, upcomingGames, birthdays, nameDays, practiceExtras, lastRefreshed: new Date().toISOString() };
+                     leagueTable, leagueTables, leagueStats, clubTeamStats, clubGames, clubPlayers, clubLineups, logoFiles, club, runLog: RUN_LOG.slice(-400), teamRosters, upcomingGames, birthdays, nameDays, practiceExtras, lastRefreshed: new Date().toISOString() };
   fs.writeFileSync(file, JSON.stringify(updated) + '\n');
   console.log(`updated static-data.json: ${boxscores.length} games, latest ${boxscores[boxscores.length - 1].date}`);
 })().catch(err => { console.error('refresh failed, static-data.json left unchanged:', err.message); process.exit(1); });
