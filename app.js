@@ -870,6 +870,7 @@ const teamSelectHtml = (name, ehl, current) => { let teams = playerTeams(name, e
 function decidedBy(b){
   const ot = b && b.periods && b.periods.OT;
   if (!ot || ot.s == null && ot.sa == null && ot.g == null && ot.ga == null) return '';
+  if (+b.htGoals === +b.atGoals) return '';            // a draw is just a draw - no OT / SO mark
   if (/playoff/i.test(b.season || '')) return 'SO';   // playoff games have no overtime result - only a shootout
   return (ot.g || 0) + (ot.ga || 0) > 0 ? 'OT' : 'SO';
 }
@@ -1804,7 +1805,7 @@ renderStatsTab();
     const home = g.home.abbr === abbr, us = home ? g.home : g.away, them = home ? g.away : g.home;
     return { date: g.date, home, opp: names[them.abbr] || them.abbr, oppAbbr: them.abbr,
       us: home ? g.hg : g.ag, them: home ? g.ag : g.hg, result: g.played ? res(home ? g.hg : g.ag, home ? g.ag : g.hg) : null, link: g.protocol,
-      decided: g.decided || (((DATA.clubGames || {})[g.division] || []).find(x => x.protocol === g.protocol) || {}).decided || '' };
+      decided: g.hg === g.ag ? '' : g.decided || (((DATA.clubGames || {})[g.division] || []).find(x => x.protocol === g.protocol) || {}).decided || '' };
   }
 
   // ---- build the same shape for every team ----

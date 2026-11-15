@@ -242,7 +242,7 @@ function parseProtocol(html, url, ourClubId) {
   // regulation = 3 x 15 min, so a goal after 45:00 is an overtime goal (EHL lists it under the 3rd period)
   const lateGoal = g.goals.some(x => { const [m, s] = String(x.time).split(':').map(Number); return m * 60 + (s || 0) > 45 * 60; });
   const ot = !so && (titles.some(x => /papild|\bOT\b/i.test(x)) || /\bOT\b|papild/i.test(pdata) || g.goals.some(x => x.period >= 4) || lateGoal);
-  g.decided = so ? 'SO' : ot ? 'OT' : '';
+  g.decided = g.hg != null && g.hg === g.ag ? '' : so ? 'SO' : ot ? 'OT' : '';   // a draw gets no OT / SO mark
   g.v = 4;   // reader version: older copies get read again once (v4: overtime goals after 45:00)
   // our players' stats table (number, position, G, A, P, PIM)
   for (const tb of html.matchAll(/<table class="protocol-stats"><thead><tr><th[^>]*>#<\/th><th class="img-inlcuded"><a href="\/komandas\/[^"\/]+\/(\d+)"[\s\S]*?<tbody>([\s\S]*?)<\/tbody>/g)) {
@@ -394,7 +394,7 @@ function parseTeamView(html) {
         home: { abbr: abbrs[0], id: ids.length === 2 ? ids[0] : null, img: imgs.length === 2 ? imgs[0] : null, name: titles.length === 2 ? titles[0] : null },
         away: { abbr: abbrs[1], id: ids.length === 2 ? ids[1] : null, img: imgs.length === 2 ? imgs[1] : null, name: titles.length === 2 ? titles[1] : null },
         played: !!score, hg: score ? +score[1] : null, ag: score ? +score[2] : null,
-        decided: /\b(so|bullīt|shoot)/.test(extra) ? 'SO' : /\b(ot|papild)/.test(extra) ? 'OT' : '',
+        decided: !score || +score[1] === +score[2] ? '' : /\b(so|bullīt|shoot)/.test(extra) ? 'SO' : /\b(ot|papild)/.test(extra) ? 'OT' : '',
         protocol: prot ? `${EHL}/protokols/${prot}` : null,
       });
     }
