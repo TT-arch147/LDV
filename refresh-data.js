@@ -187,6 +187,40 @@ function crossTableProtocols(html) {
 const LV_MONTH_FULL = { 'janvāris':1,'februāris':2,'marts':3,'aprīlis':4,'maijs':5,'jūnijs':6,'jūlijs':7,'augusts':8,'septembris':9,'oktobris':10,'novembris':11,'decembris':12 };
 const fixCase = n => String(n || '').trim().split(/\s+/).map(w => /^[IVX]+$/.test(w) ? w : (w.length > 1 && w === w.toUpperCase() ? w[0] + w.slice(1).toLowerCase() : w)).join(' ');
 const pidOf = href => (String(href).match(/\/personas\/[a-z0-9-]+\/(\d+)/) || [])[1] || null;
+// ---- goal times from the YouTube description of an EHL game video ----
+// Reads the description from the watch page and gives each protocol goal a link that opens the video at that goal.
+// Goals are matched by the running score ("Vārti 1:0"), so a missing or extra line does not shift the rest.
+async function addGoalVideos(gm) {
+  const id = (String(gm.video).match(/(?:embed\/|v=|youtu\.be\/)([\w-]{11})/) || [])[1];
+  if (!id) return false;
+  const res = await fetch(`https://www.youtube.com/watch?v=${id}&hl=lv`, { headers: {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+    'Accept-Language': 'lv,en;q=0.8', 'Cookie': 'CONSENT=YES+cb; SOCS=CAI' } });
+  const html = await res.text();
+  const raw = (html.match(/"shortDescription":"((?:[^"\\]|\\.)*)"/) || [])[1];
+  if (!raw) return false;
+  const text = JSON.parse(`"${raw}"`);
+  const marks = [];
+  for (const line of text.split(/\r?\n/)) {
+    const m = line.trim().match(/^(?:(\d{1,2}):)?(\d{1,2}):(\d{2})\s+V[āa]rti\s+(\d+)\s*:\s*(\d+)/i);
+    if (m) marks.push({ sec: (+m[1] || 0) * 3600 + +m[2] * 60 + +m[3], score: `${m[4]}:${m[5]}` });
+  }
+  if (!marks.length) return false;
+  // running score after each goal, home:away and away:home; the description's own order is whichever matches more
+  const toSec = t => { const [a, b] = String(t).split(':').map(Number); return a * 60 + (b || 0); };
+  const goals = gm.goals.filter(x => x.period <= 4).slice().sort((a, b) => a.period - b.period || toSec(a.time) - toSec(b.time));
+  let h = 0, a = 0;
+  const after = goals.map(x => { ((x.side === 'us') === (gm.ourSide === 'home')) ? h++ : a++; return { x, ha: `${h}:${a}`, ah: `${a}:${h}` }; });
+  const has = sc => marks.some(m => m.score === sc);
+  const key = after.filter(r => has(r.ha)).length >= after.filter(r => has(r.ah)).length ? 'ha' : 'ah';
+  let n = 0;
+  for (const r of after) {
+    const m = marks.find(mk => mk.score === r[key]);
+    if (m) { r.x.video = `https://www.youtube.com/watch?v=${id}&t=${m.sec}s`; n++; }
+  }
+  return n > 0;
+}
+
 function parseProtocol(html, url, ourClubId) {
   const strip = s => String(s).replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
   const dm = html.match(/<div class="date">\s*(\d{1,2})\.\s*([A-ZĀČĒĢĪĶĻŅŠŪŽa-zāčēģīķļņšūž]+),\s*(\d{4})/);
@@ -702,6 +736,16 @@ async function fetchPracticeExtras(previous) {
         // 1 July, EHL's placeholder, gets its real date later)
         if (old && !old.played && old.date > todayIso && old.readAt && Date.now() - Date.parse(old.readAt) < 20 * 3600e3) continue;
         try { const gm = parseProtocol(await getHtml(url), url, OUR_CLUB[div]); if (gm) { gm.readAt = new Date().toISOString(); known[url] = gm; read++; } } catch (e) { /* keep the old copy */ }
+      }
+      // goal times in the game video: EHL now lists every goal in the YouTube description
+      // ("26:02 Vārti 1:0 · LV2 · #15 ..."). Recent games are checked until all their goals have a time,
+      // because the description is often filled in a day or two after the game.
+      const monthAgo = new Date(Date.now() - 45 * 864e5).toISOString().slice(0, 10);
+      for (const gm of Object.values(known)) {
+        if (!gm || !gm.played || !gm.video || gm.date < monthAgo || !(gm.goals || []).length) continue;
+        if (gm.goals.every(x => x.video || x.period > 4)) continue;
+        try { if (await addGoalVideos(gm)) console.log(`video times ${div} ${gm.date}: ${gm.goals.filter(x => x.video).length}/${gm.goals.length} goals`); }
+        catch (e) { console.error(`video times ${div} ${gm.date}:`, e.message); }
       }
       // earlier seasons, collected once by the "Collect EHL history" job
       try {
