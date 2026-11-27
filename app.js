@@ -2685,12 +2685,14 @@ const HL = (function(){
     else { const prev = window.onYouTubeIframeAPIReady; window.onYouTubeIframeAPIReady = () => { if (prev) prev(); make(); };
       if (!loadingApi && !clipApiWait) { clipApiWait = true; loadingApi = true; const s = document.createElement('script'); s.src = 'https://www.youtube.com/iframe_api'; document.head.appendChild(s); } }
   }
-  // E5 ▶ video links open here instead of on YouTube
+  // ▶ video links of single goals open here instead of on YouTube: E5 goals from the game sheet, and
+  // Ledus Veči II / III goals with a time from the EHL video (the whole-game "Spēles video" link still opens YouTube)
   document.addEventListener('click', e => {
     const a = e.target.closest('a[href*="youtube.com/watch"], a[href*="youtu.be/"]'); if (!a) return;
-    if (a.closest('.club-view')) return;   // Ledus Veči II / III keep their own links
-    if (!findGoal(a.getAttribute('href'))) return;
-    e.preventDefault(); clip(a.getAttribute('href'));
+    const href = a.getAttribute('href');
+    if (a.closest('.club-view')) { if (!a.classList.contains('goal-video') || !secOf(href)) return; }
+    else if (!findGoal(href)) return;
+    e.preventDefault(); clip(href);
   }, true);
   return { open, goalsOf };
 })();
