@@ -187,25 +187,68 @@ function crossTableProtocols(html) {
 const LV_MONTH_FULL = { 'janvāris':1,'februāris':2,'marts':3,'aprīlis':4,'maijs':5,'jūnijs':6,'jūlijs':7,'augusts':8,'septembris':9,'oktobris':10,'novembris':11,'decembris':12 };
 const fixCase = n => String(n || '').trim().split(/\s+/).map(w => /^[IVX]+$/.test(w) ? w : (w.length > 1 && w === w.toUpperCase() ? w[0] + w.slice(1).toLowerCase() : w)).join(' ');
 const pidOf = href => (String(href).match(/\/personas\/[a-z0-9-]+\/(\d+)/) || [])[1] || null;
+// The description of a YouTube video, without an API key. YouTube sometimes answers GitHub's servers with a
+// consent or "not a bot" page instead of the video page, so three ways are tried in turn and the log says which failed.
+async function ytDescription(id) {
+  const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36';
+  const fails = [];
+  // 1) the watch page
+  try {
+    const res = await fetch(`https://www.youtube.com/watch?v=${id}&hl=lv&bpctr=9999999999&has_verified=1`, { headers: {
+      'User-Agent': UA, 'Accept-Language': 'lv,en;q=0.8', 'Cookie': 'CONSENT=YES+cb; SOCS=CAI' } });
+    const html = await res.text();
+    const raw = (html.match(/"shortDescription":"((?:[^"\\]|\\.)*)"/) || [])[1];
+    if (raw) return JSON.parse(`"${raw}"`);
+    fails.push(`watch page ${res.status}, ${html.length} bytes${/consent\.youtube|before you continue/i.test(html) ? ', consent page' : ''}${/not a bot/i.test(html) ? ', bot check' : ''}`);
+  } catch (e) { fails.push('watch page: ' + e.message); }
+  // 2) YouTube's own player API, as the web player and the Android app call it
+  const api = async (endpoint, client) => {
+    const res = await fetch(`https://www.youtube.com/youtubei/v1/${endpoint}?prettyPrint=false`, { method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'User-Agent': client.ua || UA, 'Origin': 'https://www.youtube.com' },
+      body: JSON.stringify({ videoId: id, context: { client: { ...client.c, hl: 'lv', gl: 'LV' } } }) });
+    return { status: res.status, json: await res.json().catch(() => null) };
+  };
+  const WEB = { c: { clientName: 'WEB', clientVersion: '2.20241126.01.00' } };
+  const ANDROID = { c: { clientName: 'ANDROID', clientVersion: '19.44.38', androidSdkVersion: 34 },
+    ua: 'com.google.android.youtube/19.44.38 (Linux; U; Android 14) gzip' };
+  for (const [name, client] of [['web', WEB], ['android', ANDROID]]) {
+    try {
+      const r = await api('player', client);
+      const d = r.json && r.json.videoDetails && r.json.videoDetails.shortDescription;
+      if (d) return d;
+      fails.push(`player/${name} ${r.status}${r.json && r.json.playabilityStatus ? ' ' + r.json.playabilityStatus.status : ''}`);
+    } catch (e) { fails.push(`player/${name}: ${e.message}`); }
+  }
+  // 3) the "next" API (the page beside the video), which carries the description too
+  try {
+    const r = await api('next', WEB);
+    const found = [];
+    (function walk(o) { if (!o || typeof o !== 'object') return;
+      if (o.attributedDescriptionBodyText && o.attributedDescriptionBodyText.content) found.push(o.attributedDescriptionBodyText.content);
+      if (o.attributedDescription && o.attributedDescription.content) found.push(o.attributedDescription.content);
+      for (const k in o) walk(o[k]); })(r.json);
+    const d = found.sort((a, b) => b.length - a.length)[0];
+    if (d) return d;
+    fails.push(`next ${r.status}`);
+  } catch (e) { fails.push('next: ' + e.message); }
+  console.error(`video ${id}: description not read (${fails.join('; ')})`);
+  return null;
+}
+
 // ---- goal times from the YouTube description of an EHL game video ----
 // Reads the description from the watch page and gives each protocol goal a link that opens the video at that goal.
 // Goals are matched by the running score ("Vārti 1:0"), so a missing or extra line does not shift the rest.
 async function addGoalVideos(gm) {
   const id = (String(gm.video).match(/(?:embed\/|v=|youtu\.be\/)([\w-]{11})/) || [])[1];
   if (!id) return false;
-  const res = await fetch(`https://www.youtube.com/watch?v=${id}&hl=lv`, { headers: {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
-    'Accept-Language': 'lv,en;q=0.8', 'Cookie': 'CONSENT=YES+cb; SOCS=CAI' } });
-  const html = await res.text();
-  const raw = (html.match(/"shortDescription":"((?:[^"\\]|\\.)*)"/) || [])[1];
-  if (!raw) return false;
-  const text = JSON.parse(`"${raw}"`);
+  const text = await ytDescription(id);
+  if (!text) return false;
   const marks = [];
   for (const line of text.split(/\r?\n/)) {
     const m = line.trim().match(/^(?:(\d{1,2}):)?(\d{1,2}):(\d{2})\s+V[āa]rti\s+(\d+)\s*:\s*(\d+)/i);
     if (m) marks.push({ sec: (+m[1] || 0) * 3600 + +m[2] * 60 + +m[3], score: `${m[4]}:${m[5]}` });
   }
-  if (!marks.length) return false;
+  if (!marks.length) { console.log(`video ${id}: description has no goal lines yet`); return false; }
   // running score after each goal, home:away and away:home; the description's own order is whichever matches more
   const toSec = t => { const [a, b] = String(t).split(':').map(Number); return a * 60 + (b || 0); };
   const goals = gm.goals.filter(x => x.period <= 4).slice().sort((a, b) => a.period - b.period || toSec(a.time) - toSec(b.time));
